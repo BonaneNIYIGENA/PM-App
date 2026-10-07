@@ -32,6 +32,9 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+*.db
+*.sqlite
+*.sqlite3
 
 # Symbolication related
 app.*.symbols
