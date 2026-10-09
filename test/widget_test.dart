@@ -107,6 +107,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(_filterPill('Overdue'));
     await tester.tap(_filterPill('Overdue'));
     await tester.pumpAndSettle();
 

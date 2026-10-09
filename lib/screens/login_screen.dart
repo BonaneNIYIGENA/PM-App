@@ -124,8 +124,11 @@ class _SignUpFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    // A [Wrap] lets the prompt and the link flow onto a second line instead of
+    // overflowing when the text grows, for example under a large text scale.
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[
         Text("Don't have an account? ", style: AppTextStyles.subtitle),
         GestureDetector(

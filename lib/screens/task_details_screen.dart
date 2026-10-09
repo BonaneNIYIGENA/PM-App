@@ -37,9 +37,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   /// one used in the design reference.
   static String _slaMessageFor(TaskStatus status) => switch (status) {
     TaskStatus.onTrack => 'The task is progressing as expected.',
-    TaskStatus.atRisk => 'This task is at risk of breaching its SLA.',
-    TaskStatus.overdue => 'This task has breached its SLA.',
-    TaskStatus.todo => 'Work on this task has not started yet.',
+    TaskStatus.atRisk => 'The task is at risk of breaching its SLA.',
+    TaskStatus.overdue => 'The task has breached its SLA.',
+    TaskStatus.todo => 'The task has not started yet.',
   };
 
   /// Only a high priority is highlighted; the design shows it in red.
