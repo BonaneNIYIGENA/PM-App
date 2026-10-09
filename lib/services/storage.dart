@@ -1,10 +1,8 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import '../models/tasks.dart';
 import '../models/team_member.dart';
+import 'database_platform.dart';
 
 class StorageService {
   StorageService._();
@@ -16,19 +14,14 @@ class StorageService {
 
   Future<Database> _openDatabase() async {
     try {
-      if (kIsWeb) {
-        // The web adapter persists SQLite data in browser IndexedDB.
-        databaseFactory = databaseFactoryFfiWeb;
-      }
-      final databasePath = kIsWeb
-          ? 'taskms_web.db'
-          : p.join(await getDatabasesPath(), 'taskms.db');
-      final db = await openDatabase(
-        databasePath,
-        version: 2,
-        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-        onCreate: (db, version) async {
-          await db.execute('''
+      final factory = await databaseFactoryForCurrentPlatform();
+      final db = await factory.openDatabase(
+        await databasePathForCurrentPlatform(),
+        options: OpenDatabaseOptions(
+          version: 2,
+          onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+          onCreate: (db, version) async {
+            await db.execute('''
           CREATE TABLE members (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -37,7 +30,7 @@ class StorageService {
             initials TEXT NOT NULL
           )
         ''');
-          await db.execute('''
+            await db.execute('''
           CREATE TABLE tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -50,17 +43,18 @@ class StorageService {
             FOREIGN KEY (assignee_id) REFERENCES members(id) ON DELETE SET NULL
           )
         ''');
-          await db.execute(
-            'CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
-          );
-        },
-        onUpgrade: (db, oldVersion, newVersion) async {
-          if (oldVersion < 2) {
             await db.execute(
               'CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
             );
-          }
-        },
+          },
+          onUpgrade: (db, oldVersion, newVersion) async {
+            if (oldVersion < 2) {
+              await db.execute(
+                'CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+              );
+            }
+          },
+        ),
       );
       await _seedIfEmpty(db);
       return db;
