@@ -301,7 +301,7 @@ class UserSelectionScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 28),
                   Text(
-                    'Welcome to SprintMate',
+                    'Welcome to taskMS',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       color: AppTheme.ink,

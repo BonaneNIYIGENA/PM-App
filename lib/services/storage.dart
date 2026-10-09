@@ -21,8 +21,8 @@ class StorageService {
         databaseFactory = databaseFactoryFfiWeb;
       }
       final databasePath = kIsWeb
-          ? 'sprintmate_web.db'
-          : p.join(await getDatabasesPath(), 'sprintmate.db');
+          ? 'taskms_web.db'
+          : p.join(await getDatabasesPath(), 'taskms.db');
       final db = await openDatabase(
         databasePath,
         version: 2,

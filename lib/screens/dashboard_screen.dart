@@ -97,7 +97,7 @@ class DashboardScreen extends StatelessWidget {
                         children: [
                           const Expanded(
                             child: Text(
-                              'Sprint delivery',
+                              'Task progress',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 17,

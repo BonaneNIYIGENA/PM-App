@@ -14,7 +14,7 @@ class ProjectTrackerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SprintMate',
+      title: 'taskMS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       home: const HomeScreen(),
