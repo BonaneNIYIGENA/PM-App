@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/tasks.dart';
 import '../models/team_member.dart';
 import '../services/storage.dart';
-import '../theme/apptheme.dart';
+import 'auth_screen.dart';
 import 'dashboard_screen.dart';
 import 'profile_screen.dart';
 import 'task_details_screen.dart';
@@ -130,6 +130,28 @@ class _HomeScreenState extends State<HomeScreen> {
     await _refresh();
   }
 
+  Future<void> _registerAccount(String name, String email, String role) async {
+    final initials = name
+        .split(RegExp(r'\s+'))
+        .take(2)
+        .map((part) => part[0])
+        .join()
+        .toUpperCase();
+    try {
+      await _storage.saveMember(
+        TeamMember(name: name, role: role, email: email, initials: initials),
+      );
+      await _refresh();
+      final created = _members.firstWhere((m) => m.email == email);
+      if (mounted) setState(() => _currentMember = created);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not create your account.')),
+      );
+    }
+  }
+
   Future<void> _saveMember(TeamMember member) async {
     try {
       await _storage.saveMember(member);
@@ -198,9 +220,10 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     if (_currentMember == null) {
-      return UserSelectionScreen(
+      return AuthScreen(
         members: _members,
-        onSelect: (member) => setState(() => _currentMember = member),
+        onSignIn: (member) => setState(() => _currentMember = member),
+        onRegister: _registerAccount,
       );
     }
 
@@ -271,106 +294,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
-
-class UserSelectionScreen extends StatelessWidget {
-  const UserSelectionScreen({
-    super.key,
-    required this.members,
-    required this.onSelect,
-  });
-  final List<TeamMember> members;
-  final ValueChanged<TeamMember> onSelect;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      color: AppTheme.navy,
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                    child: const Icon(
-                      Icons.track_changes_rounded,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Text(
-                    'Welcome to taskMS',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Choose your team profile to continue.',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  if (members.isEmpty)
-                    const Text(
-                      'No team members yet. Ask a teammate to add a profile.',
-                    ),
-                  ...members.map(
-                    (member) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Card(
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 5,
-                          ),
-                          leading: CircleAvatar(
-                            backgroundColor: Theme.of(context)
-                                .colorScheme
-                                .primaryContainer,
-                            child: Text(
-                              member.initials,
-                              style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            member.name,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          subtitle: Text(member.role),
-                          trailing: const Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 16,
-                          ),
-                          onTap: () => onSelect(member),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
 }
