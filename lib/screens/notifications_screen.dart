@@ -157,3 +157,67 @@ class _AlertTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
+const SizedBox(height: 3),
+                Text(
+                  sla == SlaStatus.overdue
+                      ? 'Overdue · was due ${shortDate(task.deadline)}'
+                      : 'Due soon · ${dueChipLabel(task)}',
+                  style: TextStyle(color: color, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right_rounded,
+            color: context.scheme.onSurfaceVariant,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityTile extends StatelessWidget {
+  const _ActivityTile({required this.item, required this.onTap});
+  final AppNotification item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = switch (item.type) {
+      'created' => (Icons.add_task_rounded, context.colors.info),
+      'completed' => (Icons.check_circle_rounded, context.colors.success),
+      'reopened' => (Icons.replay_rounded, context.colors.warning),
+      'deleted' => (Icons.delete_outline_rounded, context.colors.danger),
+      'assigned' => (Icons.person_add_alt_1_rounded, context.colors.pink),
+      'alert' => (Icons.notifications_active_rounded, context.colors.warning),
+      'team' => (Icons.groups_rounded, context.colors.violet),
+      'welcome' => (Icons.waving_hand_rounded, context.colors.violet),
+      _ => (Icons.edit_note_rounded, context.colors.violet),
+    };
+    return AppCard(
+      onTap: item.taskId == null ? null : onTap,
+      color: item.isRead
+          ? null
+          : context.soft(context.scheme.primary, alpha: .07),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _IconBubble(icon: icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
