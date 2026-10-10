@@ -266,4 +266,102 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-               
+                                  formatDate(_deadline),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: context.scheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _submit,
+                    icon: Icon(
+                      editing ? Icons.check_rounded : Icons.add_rounded,
+                    ),
+                    label: Text(editing ? 'Save changes' : 'Create task'),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Label extends StatelessWidget {
+  const _Label({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: context.text.labelLarge?.copyWith(
+      color: context.scheme.onSurfaceVariant,
+      fontWeight: FontWeight.w700,
+    ),
+  );
+}
+
+class _Choice extends StatelessWidget {
+  const _Choice({
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    borderRadius: 14,
+    scale: .95,
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected
+            ? context.soft(color, alpha: .18)
+            : context.scheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: selected ? color : context.scheme.outlineVariant,
+          width: selected ? 1.6 : 1,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 13.5,
+          color: selected ? color : context.scheme.onSurfaceVariant,
+        ),
+      ),
+    ),
+  );
+}
