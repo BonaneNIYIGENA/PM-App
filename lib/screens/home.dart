@@ -12,7 +12,14 @@ import 'tasks_screen.dart';
 import 'team_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    required this.isDarkMode,
+    required this.onDarkModeChanged,
+  });
+
+  final bool isDarkMode;
+  final ValueChanged<bool> onDarkModeChanged;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -205,6 +212,8 @@ class _HomeScreenState extends State<HomeScreen> {
         onOpenTask: _openTask,
         onAddTask: () => _createOrEditTask(),
         onShowTasks: () => setState(() => _tab = 1),
+        isDarkMode: widget.isDarkMode,
+        onDarkModeChanged: widget.onDarkModeChanged,
       ),
       TasksScreen(
         tasks: _tasks,

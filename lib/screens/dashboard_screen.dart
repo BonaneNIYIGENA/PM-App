@@ -15,6 +15,8 @@ class DashboardScreen extends StatelessWidget {
     required this.onOpenTask,
     required this.onAddTask,
     required this.onShowTasks,
+    required this.isDarkMode,
+    required this.onDarkModeChanged,
   });
 
   final List<ProjectTask> tasks;
@@ -23,6 +25,8 @@ class DashboardScreen extends StatelessWidget {
   final ValueChanged<ProjectTask> onOpenTask;
   final VoidCallback onAddTask;
   final VoidCallback onShowTasks;
+  final bool isDarkMode;
+  final ValueChanged<bool> onDarkModeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +75,15 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    onPressed: () => onDarkModeChanged(!isDarkMode),
+                    icon: Icon(
+                      isDarkMode
+                          ? Icons.light_mode_outlined
+                          : Icons.dark_mode_outlined,
+                    ),
+                    tooltip: isDarkMode ? 'Light mode' : 'Dark mode',
                   ),
                   CircleAvatar(
                     radius: 23,
