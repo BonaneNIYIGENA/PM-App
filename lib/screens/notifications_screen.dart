@@ -221,3 +221,58 @@ class _ActivityTile extends StatelessWidget {
                         ),
                       ),
                     ),
+if (!item.isRead)
+                      Container(
+                        width: 8,
+                        height: 8,
+                        margin: const EdgeInsets.only(left: 8),
+                        decoration: BoxDecoration(
+                          color: context.scheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.body,
+                  style: TextStyle(
+                    color: context.scheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  timeAgo(item.createdAt),
+                  style: TextStyle(
+                    color: context.scheme.onSurfaceVariant.withValues(
+                      alpha: .8,
+                    ),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconBubble extends StatelessWidget {
+  const _IconBubble({required this.icon, required this.color});
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 42,
+    height: 42,
+    decoration: BoxDecoration(
+      color: context.soft(color, alpha: context.isDark ? .22 : .14),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Icon(icon, color: color, size: 22),
+  );
+}
