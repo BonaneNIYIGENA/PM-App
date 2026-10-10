@@ -117,3 +117,24 @@ class NotificationsService {
       );
       return;
     }
+    
+final reminderAt = task.deadline.subtract(const Duration(hours: 1));
+    if (!reminderAt.isAfter(DateTime.now())) {
+      await _plugin.show(
+        id: id,
+        title: 'Task due soon',
+        body: '“${task.title}” is due ${_dueLabel(task.deadline)}.',
+        notificationDetails: details,
+      );
+      return;
+    }
+
+    await _plugin.zonedSchedule(
+      id: id,
+      title: 'Task due soon',
+      body: '“${task.title}” is due in about one hour.',
+      scheduledDate: tz.TZDateTime.from(reminderAt, tz.local),
+      notificationDetails: details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+  }
