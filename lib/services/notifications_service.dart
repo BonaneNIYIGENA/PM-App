@@ -85,3 +85,35 @@ class NotificationsService {
         return true;
     }
   }
+
+  static Future<void> remindAboutTask(ProjectTask task) async {
+    if (!_initialized) await initialize();
+    final id = task.id ?? task.title.hashCode.abs();
+    await _plugin.cancel(id: id);
+    final details = const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'task_deadlines',
+        'Task reminders',
+        channelDescription: 'Reminders about upcoming task deadlines.',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: DarwinNotificationDetails(),
+      macOS: DarwinNotificationDetails(),
+      linux: LinuxNotificationDetails(),
+      windows: WindowsNotificationDetails(),
+      web: WebNotificationDetails(),
+    );
+
+    // Browsers and Linux desktops cannot reliably deliver scheduled alerts.
+    // Show an immediate local notice there; mobile and Windows get a due-time
+    // reminder when the deadline is still far enough in the future.
+    if (kIsWeb || defaultTargetPlatform == TargetPlatform.linux) {
+      await _plugin.show(
+        id: id,
+        title: 'Task saved',
+        body: '“${task.title}” is due ${_dueLabel(task.deadline)}.',
+        notificationDetails: details,
+      );
+      return;
+    }
