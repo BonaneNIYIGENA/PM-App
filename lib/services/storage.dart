@@ -203,4 +203,22 @@ class StorageService {
     final db = await database;
     await db.delete('members', where: 'id = ?', whereArgs: [id]);
   }
+
+  Future<bool> loadDarkMode() async {
+    final db = await database;
+    final rows = await db.query(
+      'app_meta',
+      where: 'key = ?',
+      whereArgs: ['dark_mode'],
+    );
+    return rows.isNotEmpty && rows.first['value'] == 'true';
+  }
+
+  Future<void> saveDarkMode(bool enabled) async {
+    final db = await database;
+    await db.insert('app_meta', {
+      'key': 'dark_mode',
+      'value': enabled.toString(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
 }
