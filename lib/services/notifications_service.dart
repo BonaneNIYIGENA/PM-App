@@ -138,3 +138,21 @@ final reminderAt = task.deadline.subtract(const Duration(hours: 1));
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
   }
+
+  static Future<void> cancelTaskReminder(ProjectTask task) async {
+    if (!_initialized) await initialize();
+    await _plugin.cancel(id: task.id ?? task.title.hashCode.abs());
+  }
+
+  static Future<void> cancelAllReminders() async {
+    if (!_initialized) await initialize();
+    await _plugin.cancelAll();
+  }
+
+  static String _dueLabel(DateTime deadline) {
+    final date = deadline.toLocal();
+    return '${date.month}/${date.day} at '
+        '${date.hour.toString().padLeft(2, '0')}:'
+        '${date.minute.toString().padLeft(2, '0')}';
+  }
+}
