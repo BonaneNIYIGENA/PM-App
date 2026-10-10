@@ -94,3 +94,66 @@ class NotificationsScreen extends StatelessWidget {
                   ),
                 const SizedBox(height: 14),
               ],
+               if (items.isNotEmpty) ...[
+                const SectionHeader(title: 'Recent activity'),
+                const SizedBox(height: 8),
+                for (var i = 0; i < items.length; i++)
+                  FadeSlideIn(
+                    key: ValueKey(items[i].id),
+                    index: i + alerts.length,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _ActivityTile(
+                        item: items[i],
+                        onTap: () {
+                          final id = items[i].taskId;
+                          for (final task in tasks) {
+                            if (task.id == id) {
+                              onOpenTask(task);
+                              return;
+                            }
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AlertTile extends StatelessWidget {
+  const _AlertTile({required this.task, required this.onTap});
+  final ProjectTask task;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final sla = SlaService.calculate(task);
+    final color = slaColor(context, sla);
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          _IconBubble(
+            icon: sla == SlaStatus.overdue
+                ? Icons.error_outline_rounded
+                : Icons.schedule_rounded,
+            color: color,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
