@@ -60,7 +60,9 @@ class DashboardScreen extends StatelessWidget {
                           style: Theme.of(context).textTheme.labelMedium
                               ?.copyWith(
                                 letterSpacing: 1.3,
-                                color: Colors.black54,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                                 fontWeight: FontWeight.w700,
                               ),
                         ),
@@ -70,7 +72,7 @@ class DashboardScreen extends StatelessWidget {
                           style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(
                                 fontWeight: FontWeight.w800,
-                                color: AppTheme.ink,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                         ),
                       ],
@@ -87,11 +89,13 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   CircleAvatar(
                     radius: 23,
-                    backgroundColor: const Color(0xFFE4EBFA),
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .primaryContainer,
                     child: Text(
                       currentMember.initials,
-                      style: const TextStyle(
-                        color: AppTheme.navy,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -100,7 +104,7 @@ class DashboardScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               Card(
-                color: AppTheme.navy,
+                color: Theme.of(context).colorScheme.primary,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
@@ -108,11 +112,11 @@ class DashboardScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Task progress',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onPrimary,
                                 fontSize: 17,
                                 fontWeight: FontWeight.w700,
                               ),
@@ -124,9 +128,9 @@ class DashboardScreen extends StatelessWidget {
                                 builder: (_) => StatisticsScreen(tasks: tasks),
                               ),
                             ),
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.insights_rounded,
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onPrimary,
                             ),
                             tooltip: 'View statistics',
                           ),
@@ -134,7 +138,10 @@ class DashboardScreen extends StatelessWidget {
                       ),
                       Text(
                         '${(progress * 100).round()}% complete',
-                        style: const TextStyle(color: Colors.white70),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary
+                              .withValues(alpha: .75),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       ClipRRect(
@@ -142,14 +149,20 @@ class DashboardScreen extends StatelessWidget {
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 9,
-                          backgroundColor: Colors.white24,
+                          backgroundColor: Theme.of(context)
+                              .colorScheme
+                              .onPrimary
+                              .withValues(alpha: .25),
                           color: const Color(0xFF73D7C7),
                         ),
                       ),
                       const SizedBox(height: 14),
                       Text(
                         '$completed of ${tasks.length} tasks completed',
-                        style: const TextStyle(color: Colors.white70),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary
+                              .withValues(alpha: .75),
+                        ),
                       ),
                     ],
                   ),
@@ -163,7 +176,7 @@ class DashboardScreen extends StatelessWidget {
                       title: 'All tasks',
                       value: '${tasks.length}',
                       icon: Icons.grid_view_rounded,
-                      color: AppTheme.navy,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -291,8 +304,9 @@ class _MetricCard extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall
-                      ?.copyWith(color: Colors.black54),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),

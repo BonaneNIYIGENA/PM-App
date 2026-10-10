@@ -313,14 +313,15 @@ class UserSelectionScreen extends StatelessWidget {
                     'Welcome to taskMS',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: AppTheme.ink,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Choose your team profile to continue.',
-                    style: Theme.of(context).textTheme.bodyLarge
-                        ?.copyWith(color: Colors.black54),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   if (members.isEmpty)
@@ -337,11 +338,15 @@ class UserSelectionScreen extends StatelessWidget {
                             vertical: 5,
                           ),
                           leading: CircleAvatar(
-                            backgroundColor: const Color(0xFFE8EDF8),
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .primaryContainer,
                             child: Text(
                               member.initials,
-                              style: const TextStyle(
-                                color: AppTheme.navy,
+                              style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
