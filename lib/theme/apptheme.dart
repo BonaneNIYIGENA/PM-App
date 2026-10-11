@@ -112,7 +112,7 @@ class AppColors {
     success: Color(0xFF0F9F78),
     warning: Color(0xFFD97706),
     danger: Color(0xFFE0383E),
-    info: Color(0xFF2F7DF6),
+    info: Color(0xFF1E3A8A),
     pink: Color(0xFFD6409F),
   );
 
@@ -121,7 +121,7 @@ class AppColors {
     success: Color(0xFF3DD6A3),
     warning: Color(0xFFFFB020),
     danger: Color(0xFFFF6B70),
-    info: Color(0xFF6AA5FF),
+    info: Color(0xFF7C9BF0),
     pink: Color(0xFFFF7EC6),
   );
 }
