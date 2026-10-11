@@ -5,19 +5,23 @@ import '../models/team_member.dart';
 import '../services/sla_service.dart';
 import '../theme/apptheme.dart';
 import '../widgets/common.dart';
+import 'task_form_screen.dart';
 
+// Task details, shown as a bottom sheet. Editing swaps the sheet content to
+// the task form in place, so only one layer is ever on screen.
 class TaskDetailsScreen extends StatefulWidget {
   const TaskDetailsScreen({
     super.key,
     required this.task,
     required this.members,
-    required this.onEdit,
+    required this.onSave,
     required this.onUpdate,
     required this.onDelete,
   });
   final ProjectTask task;
   final List<TeamMember> members;
-  final Future<ProjectTask?> Function(ProjectTask current) onEdit;
+  final Future<ProjectTask?> Function(ProjectTask saved, ProjectTask original)
+  onSave;
   final Future<void> Function(ProjectTask previous, ProjectTask updated)
   onUpdate;
   final Future<void> Function(ProjectTask task) onDelete;
@@ -29,6 +33,7 @@ class TaskDetailsScreen extends StatefulWidget {
 class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   late ProjectTask _task;
   bool _working = false;
+  bool _editing = false;
 
   @override
   void initState() {
@@ -36,9 +41,14 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     _task = widget.task;
   }
 
-  Future<void> _edit() async {
-    final updated = await widget.onEdit(_task);
-    if (updated != null && mounted) setState(() => _task = updated);
+  Future<void> _save(ProjectTask saved) async {
+    final stored = await widget.onSave(saved, _task);
+    if (stored != null && mounted) {
+      setState(() {
+        _task = stored;
+        _editing = false;
+      });
+    }
   }
 
   Future<void> _setStatus(String status) async {
@@ -86,148 +96,177 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _view(BuildContext context) {
     final assignee = memberFor(widget.members, _task.assigneeId);
     final sla = SlaService.calculate(_task);
     final done = _task.isCompleted;
-    return Scaffold(
-      appBar: AppBar(
-        leadingWidth: 66,
-        leading: const Padding(
-          padding: EdgeInsets.only(left: 20),
-          child: AppBackButton(),
+    return Column(
+      key: const ValueKey('view'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(
+            'Task details',
+            style: context.text.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
-        title: const Text('Task details'),
-        actions: [
-          RoundIconButton(
-            icon: Icons.edit_outlined,
-            tooltip: 'Edit task',
-            onTap: _edit,
-          ),
-          const SizedBox(width: 8),
-          RoundIconButton(
-            icon: Icons.delete_outline_rounded,
-            tooltip: 'Delete task',
-            color: context.colors.danger,
-            onTap: _delete,
-          ),
-          const SizedBox(width: 20),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        children: [
-          FadeSlideIn(
-            child: Row(
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SlaBadge(status: sla),
-                const SizedBox(width: 10),
-                _PriorityPill(priority: _task.priority),
+                Row(
+                  children: [
+                    SlaBadge(status: sla),
+                    const SizedBox(width: 10),
+                    _PriorityPill(priority: _task.priority),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  _task.title,
+                  style: context.text.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _StatusSelector(
+                  value: _task.status,
+                  enabled: !_working,
+                  onChanged: _setStatus,
+                ),
+                const SizedBox(height: 18),
+                AppCard(
+                  child: Column(
+                    children: [
+                      _DetailRow(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Assigned to',
+                        value: assignee?.name ?? 'Unassigned',
+                        leading: MemberAvatar(member: assignee, radius: 13),
+                      ),
+                      const Divider(height: 26),
+                      _DetailRow(
+                        icon: Icons.event_outlined,
+                        label: 'Deadline',
+                        value: formatDate(_task.deadline),
+                      ),
+                      const Divider(height: 26),
+                      _DetailRow(
+                        icon: Icons.flag_outlined,
+                        label: 'Status',
+                        value: taskStatusLabel(_task.status),
+                      ),
+                      const Divider(height: 26),
+                      _DetailRow(
+                        icon: Icons.schedule_outlined,
+                        label: 'Created',
+                        value: formatDate(_task.createdAt),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const FormLabel('Description'),
+                AppCard(
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      _task.description.isEmpty
+                          ? 'No description provided.'
+                          : _task.description,
+                      style: TextStyle(
+                        height: 1.55,
+                        fontSize: 15,
+                        color: _task.description.isEmpty
+                            ? context.scheme.onSurfaceVariant
+                            : context.scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          FadeSlideIn(
-            index: 1,
-            child: Text(
-              _task.title,
-              style: context.text.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                height: 1.2,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton.icon(
+                onPressed: _working
+                    ? null
+                    : () => _setStatus(done ? 'todo' : 'completed'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(54),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  backgroundColor: context.isDark
+                      ? context.colors.violet
+                      : AppTheme.ink,
+                  foregroundColor: context.isDark ? Colors.black : Colors.white,
+                ),
+                icon: Icon(done ? Icons.undo_rounded : Icons.check_rounded),
+                label: Text(done ? 'Reopen task' : 'Mark as complete'),
               ),
-            ),
-          ),
-          const SizedBox(height: 22),
-          FadeSlideIn(
-            index: 2,
-            child: _StatusSelector(
-              value: _task.status,
-              enabled: !_working,
-              onChanged: _setStatus,
-            ),
-          ),
-          const SizedBox(height: 18),
-          FadeSlideIn(
-            index: 3,
-            child: AppCard(
-              child: Column(
+              const SizedBox(height: 8),
+              Row(
                 children: [
-                  _DetailRow(
-                    icon: Icons.person_outline_rounded,
-                    label: 'Assigned to',
-                    value: assignee?.name ?? 'Unassigned',
-                    leading: MemberAvatar(member: assignee, radius: 13),
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _editing = true),
+                      icon: const Icon(Icons.edit_outlined, size: 18),
+                      label: const Text('Edit'),
+                    ),
                   ),
-                  const Divider(height: 26),
-                  _DetailRow(
-                    icon: Icons.event_outlined,
-                    label: 'Deadline',
-                    value: formatDate(_task.deadline),
-                  ),
-                  const Divider(height: 26),
-                  _DetailRow(
-                    icon: Icons.flag_outlined,
-                    label: 'Status',
-                    value: taskStatusLabel(_task.status),
-                  ),
-                  const Divider(height: 26),
-                  _DetailRow(
-                    icon: Icons.schedule_outlined,
-                    label: 'Created',
-                    value: formatDate(_task.createdAt),
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: _delete,
+                      style: TextButton.styleFrom(
+                        foregroundColor: context.colors.danger,
+                      ),
+                      icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                      label: const Text('Delete'),
+                    ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 22),
-          FadeSlideIn(
-            index: 4,
-            child: const SectionHeader(title: 'Description'),
-          ),
-          const SizedBox(height: 8),
-          FadeSlideIn(
-            index: 5,
-            child: AppCard(
-              child: SizedBox(
-                width: double.infinity,
-                child: Text(
-                  _task.description.isEmpty
-                      ? 'No description provided.'
-                      : _task.description,
-                  style: TextStyle(
-                    height: 1.55,
-                    fontSize: 15,
-                    color: _task.description.isEmpty
-                        ? context.scheme.onSurfaceVariant
-                        : context.scheme.onSurface,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 26),
-          FadeSlideIn(
-            index: 6,
-            child: FilledButton.icon(
-              onPressed: _working
-                  ? null
-                  : () => _setStatus(done ? 'todo' : 'completed'),
-              icon: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: Icon(
-                  done ? Icons.undo_rounded : Icons.check_rounded,
-                  key: ValueKey(done),
-                ),
-              ),
-              label: Text(done ? 'Reopen task' : 'Mark as complete'),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * .92,
+      ),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: _editing
+            ? TaskFormScreen(
+                key: const ValueKey('edit'),
+                task: _task,
+                members: widget.members,
+                onSubmit: _save,
+                onCancel: () => setState(() => _editing = false),
+              )
+            : _view(context),
+      ),
+    ),
+  );
 }
 
 class _PriorityPill extends StatelessWidget {
