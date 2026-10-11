@@ -1,4 +1,3 @@
-````dart
 import 'package:flutter/material.dart';
 
 // The taskMS mark: a tick breaking out of a box. Same shapes as
@@ -56,6 +55,3 @@ class _LogoPainter extends CustomPainter {
   @override
   bool shouldRepaint(_LogoPainter oldDelegate) => false;
 }
-````
-
-```bash
