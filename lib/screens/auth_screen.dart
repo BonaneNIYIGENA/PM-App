@@ -48,7 +48,7 @@ class _AuthScreenState extends State<AuthScreen> {
     super.dispose();
   }
 
-  Future<void> _continue() async {
+  void _continue() {
     if (!_emailForm.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
     final email = _email.text.trim().toLowerCase();
@@ -67,8 +67,6 @@ class _AuthScreenState extends State<AuthScreen> {
       _match = found;
       _step = _Step.signingIn;
     });
-    await Future<void>.delayed(const Duration(milliseconds: 1100));
-    if (!mounted || _step != _Step.signingIn) return;
     widget.onSignIn(found);
   }
 
@@ -202,11 +200,14 @@ class _AuthScreenState extends State<AuthScreen> {
               labelText: 'Email address',
               prefixIcon: Icon(Icons.alternate_email_rounded),
             ),
-            validator: (value) =>
-                RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                    .hasMatch(value?.trim() ?? '')
-                ? null
-                : 'Enter a valid email address.',
+            validator: (value) {
+              final email = value?.trim() ?? '';
+              if (email.isEmpty) return 'Enter your email';
+              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                return 'Enter a valid email address.';
+              }
+              return null;
+            },
             onFieldSubmitted: (_) => _continue(),
           ),
         ),
@@ -305,7 +306,7 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            'We couldn’t find ${_email.text.trim()}. Add your details to get started.',
+            'No account was found for ${_email.text.trim()}. Add your details to get started.',
             style: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
           ),
           const SizedBox(height: 18),
