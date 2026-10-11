@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../models/tasks.dart';
+import '../models/app_notification.dart';
 import '../models/team_member.dart';
 import 'database_platform.dart';
 
@@ -18,7 +19,7 @@ class StorageService {
       final db = await factory.openDatabase(
         await databasePathForCurrentPlatform(),
         options: OpenDatabaseOptions(
-          version: 2,
+          version: 3,
           onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
           onCreate: (db, version) async {
             await db.execute('''
@@ -46,6 +47,7 @@ class StorageService {
             await db.execute(
               'CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
             );
+            await _createActivityTable(db);
           },
           onUpgrade: (db, oldVersion, newVersion) async {
             if (oldVersion < 2) {
@@ -53,6 +55,7 @@ class StorageService {
                 'CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
               );
             }
+            if (oldVersion < 3) await _createActivityTable(db);
           },
         ),
       );
@@ -63,6 +66,18 @@ class StorageService {
       rethrow;
     }
   }
+
+  Future<void> _createActivityTable(Database db) => db.execute('''
+    CREATE TABLE IF NOT EXISTS activity (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      task_id INTEGER,
+      created_at TEXT NOT NULL,
+      is_read INTEGER NOT NULL DEFAULT 0
+    )
+  ''');
 
   Future<void> _seedIfEmpty(Database db) async {
     final initialized = await db.query(
@@ -204,21 +219,87 @@ class StorageService {
     await db.delete('members', where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<bool> loadDarkMode() async {
+  Future<bool> loadDarkMode() => _loadPreference('dark_mode');
+
+  Future<bool> loadNotificationsEnabled() =>
+      _loadPreference('notifications_enabled');
+
+  Future<bool> _loadPreference(String key) async {
     final db = await database;
     final rows = await db.query(
       'app_meta',
+      columns: ['value'],
       where: 'key = ?',
-      whereArgs: ['dark_mode'],
+      whereArgs: [key],
+      limit: 1,
     );
     return rows.isNotEmpty && rows.first['value'] == 'true';
   }
 
-  Future<void> saveDarkMode(bool enabled) async {
+  Future<void> saveDarkMode(bool enabled) =>
+      _savePreference('dark_mode', enabled);
+
+  Future<void> saveNotificationsEnabled(bool enabled) =>
+      _savePreference('notifications_enabled', enabled);
+
+  Future<void> _savePreference(String key, bool enabled) async {
     final db = await database;
     await db.insert('app_meta', {
-      'key': 'dark_mode',
+      'key': key,
       'value': enabled.toString(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<AppNotification>> loadActivities({int limit = 100}) async {
+    final db = await database;
+    final rows = await db.query(
+      'activity',
+      orderBy: 'created_at DESC, id DESC',
+      limit: limit,
+    );
+    return rows.map(AppNotification.fromMap).toList();
+  }
+
+  Future<void> addActivity(AppNotification item) async {
+    final db = await database;
+    await db.insert('activity', item.toMap()..remove('id'));
+  }
+
+  Future<void> markAllActivitiesRead() async {
+    final db = await database;
+    await db.update('activity', {'is_read': 1}, where: 'is_read = 0');
+  }
+
+  Future<void> clearActivities() async {
+    final db = await database;
+    await db.delete('activity');
+  }
+
+  Future<String?> loadSessionEmail() async {
+    final db = await database;
+    final rows = await db.query(
+      'app_meta',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: ['session_email'],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['value'] as String;
+  }
+
+  Future<void> saveSessionEmail(String? email) async {
+    final db = await database;
+    if (email == null) {
+      await db.delete(
+        'app_meta',
+        where: 'key = ?',
+        whereArgs: ['session_email'],
+      );
+      return;
+    }
+    await db.insert('app_meta', {
+      'key': 'session_email',
+      'value': email,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }

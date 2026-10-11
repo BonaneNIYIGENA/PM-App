@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 
-import 'screens/home.dart';
+import 'services/notifications_service.dart';
 import 'services/storage.dart';
+import 'screens/home.dart';
 import 'theme/apptheme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await NotificationsService.initialize();
+  } catch (_) {
+    // The rest of the app remains usable if this device lacks notifications.
+  }
   runApp(const ProjectTrackerApp());
 }
 
@@ -22,14 +28,17 @@ class _ProjectTrackerAppState extends State<ProjectTrackerApp> {
   @override
   void initState() {
     super.initState();
-    StorageService.instance.loadDarkMode().then((enabled) {
-      if (mounted) setState(() => _darkMode = enabled);
-    });
+    StorageService.instance
+        .loadDarkMode()
+        .then((enabled) {
+          if (mounted) setState(() => _darkMode = enabled);
+        })
+        .catchError((_) {});
   }
 
-  void _setDarkMode(bool enabled) {
+  Future<void> _setDarkMode(bool enabled) async {
     setState(() => _darkMode = enabled);
-    StorageService.instance.saveDarkMode(enabled);
+    await StorageService.instance.saveDarkMode(enabled);
   }
 
   @override

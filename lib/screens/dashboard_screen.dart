@@ -4,6 +4,8 @@ import '../models/tasks.dart';
 import '../models/team_member.dart';
 import '../services/sla_service.dart';
 import '../theme/apptheme.dart';
+import '../widgets/common.dart';
+import '../widgets/task_card.dart';
 import 'statistics_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -11,22 +13,18 @@ class DashboardScreen extends StatelessWidget {
     super.key,
     required this.tasks,
     required this.members,
-    required this.currentMember,
     required this.onOpenTask,
+    required this.onToggleTask,
     required this.onAddTask,
     required this.onShowTasks,
-    required this.isDarkMode,
-    required this.onDarkModeChanged,
   });
 
   final List<ProjectTask> tasks;
   final List<TeamMember> members;
-  final TeamMember currentMember;
   final ValueChanged<ProjectTask> onOpenTask;
+  final ValueChanged<ProjectTask> onToggleTask;
   final VoidCallback onAddTask;
-  final VoidCallback onShowTasks;
-  final bool isDarkMode;
-  final ValueChanged<bool> onDarkModeChanged;
+  final ValueChanged<String> onShowTasks;
 
   @override
   Widget build(BuildContext context) {
@@ -43,361 +41,310 @@ class DashboardScreen extends StatelessWidget {
       return status == SlaStatus.overdue || status == SlaStatus.atRisk;
     }).toList()..sort((a, b) => a.deadline.compareTo(b.deadline));
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'PROJECT OVERVIEW',
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                letterSpacing: 1.3,
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          'Good day, ${currentMember.name.split(' ').first}',
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => onDarkModeChanged(!isDarkMode),
-                    icon: Icon(
-                      isDarkMode
-                          ? Icons.light_mode_outlined
-                          : Icons.dark_mode_outlined,
-                    ),
-                    tooltip: isDarkMode ? 'Light mode' : 'Dark mode',
-                  ),
-                  CircleAvatar(
-                    radius: 23,
-                    backgroundColor: Theme.of(context)
-                        .colorScheme
-                        .primaryContainer,
-                    child: Text(
-                      currentMember.initials,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 130),
+      children: [
+        FadeSlideIn(
+          child: _HeroCard(
+            progress: progress,
+            completed: completed,
+            total: tasks.length,
+            onInsights: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => StatisticsScreen(tasks: tasks)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        FadeSlideIn(index: 1, child: const SectionHeader(title: 'Overview')),
+        const SizedBox(height: 8),
+        GridView.count(
+          crossAxisCount: 2,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: 1.5,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          children: [
+            FadeSlideIn(
+              index: 2,
+              child: _StatTile(
+                label: 'All tasks',
+                value: tasks.length,
+                icon: Icons.grid_view_rounded,
+                color: context.colors.violet,
+                onTap: () => onShowTasks('All'),
               ),
-              const SizedBox(height: 20),
-              Card(
-                color: Theme.of(context).colorScheme.primary,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            FadeSlideIn(
+              index: 3,
+              child: _StatTile(
+                label: 'Completed',
+                value: completed,
+                icon: Icons.check_circle_rounded,
+                color: context.colors.success,
+                onTap: () => onShowTasks('Completed'),
+              ),
+            ),
+            FadeSlideIn(
+              index: 4,
+              child: _StatTile(
+                label: 'At risk',
+                value: atRisk,
+                icon: Icons.schedule_rounded,
+                color: context.colors.warning,
+                onTap: () => onShowTasks('At risk'),
+              ),
+            ),
+            FadeSlideIn(
+              index: 5,
+              child: _StatTile(
+                label: 'Overdue',
+                value: overdue,
+                icon: Icons.error_rounded,
+                color: context.colors.danger,
+                onTap: () => onShowTasks('Overdue'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
+        SectionHeader(
+          title: 'Needs attention',
+          actionLabel: 'See all',
+          onAction: () => onShowTasks('All'),
+        ),
+        const SizedBox(height: 6),
+        if (attention.isEmpty)
+          AppCard(
+            child: Row(
+              children: [
+                Icon(
+                  tasks.isEmpty
+                      ? Icons.inbox_outlined
+                      : Icons.celebration_rounded,
+                  color: context.colors.success,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    tasks.isEmpty
+                        ? 'Tap + to add your first task.'
+                        : 'Everything is on track. Nice work!',
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          for (var i = 0; i < attention.take(4).length; i++)
+            FadeSlideIn(
+              key: ValueKey(attention[i].id),
+              index: i + 6,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TaskCard(
+                  task: attention[i],
+                  member: memberFor(members, attention[i].assigneeId),
+                  onTap: () => onOpenTask(attention[i]),
+                  onToggle: () => onToggleTask(attention[i]),
+                ),
+              ),
+            ),
+      ],
+    );
+  }
+}
+
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({
+    required this.progress,
+    required this.completed,
+    required this.total,
+    required this.onInsights,
+  });
+  final double progress;
+  final int completed;
+  final int total;
+  final VoidCallback onInsights;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(28),
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF5B3BEA), Color(0xFF9A7BFF)],
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF6C4CF1)
+              .withValues(alpha: context.isDark ? .25 : .35),
+          blurRadius: 26,
+          offset: const Offset(0, 12),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Sprint delivery',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '$completed of $total tasks completed',
+                style: const TextStyle(color: Color(0xFFEDE8FF), height: 1.3),
+              ),
+              const SizedBox(height: 16),
+              Pressable(
+                borderRadius: 20,
+                onTap: onInsights,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Task progress',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onPrimary,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => StatisticsScreen(tasks: tasks),
-                              ),
-                            ),
-                            icon: Icon(
-                              Icons.insights_rounded,
-                              color: Theme.of(context).colorScheme.onPrimary,
-                            ),
-                            tooltip: 'View statistics',
-                          ),
-                        ],
+                      Icon(
+                        Icons.insights_rounded,
+                        size: 18,
+                        color: Color(0xFF4B2FD0),
                       ),
+                      SizedBox(width: 6),
                       Text(
-                        '${(progress * 100).round()}% complete',
+                        'View insights',
                         style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary
-                              .withValues(alpha: .75),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 9,
-                          backgroundColor: Theme.of(context)
-                              .colorScheme
-                              .onPrimary
-                              .withValues(alpha: .25),
-                          color: const Color(0xFF73D7C7),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        '$completed of ${tasks.length} tasks completed',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary
-                              .withValues(alpha: .75),
+                          color: Color(0xFF4B2FD0),
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'All tasks',
-                      value: '${tasks.length}',
-                      icon: Icons.grid_view_rounded,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Completed',
-                      value: '$completed',
-                      icon: Icons.check_circle_outline,
-                      color: AppTheme.teal,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'At risk',
-                      value: '$atRisk',
-                      icon: Icons.warning_amber_rounded,
-                      color: const Color(0xFFC47A13),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Overdue',
-                      value: '$overdue',
-                      icon: Icons.error_outline_rounded,
-                      color: const Color(0xFFCB4B51),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Needs attention',
-                      style: Theme.of(context).textTheme.titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: onShowTasks,
-                    child: const Text('All tasks'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (attention.isEmpty)
-                _EmptyCard(
-                  icon: Icons.check_circle_outline,
-                  message: tasks.isEmpty
-                      ? 'Add a task to see project work here.'
-                      : 'Everything is on track. Nice work!',
-                )
-              else
-                ...attention
-                    .take(3)
-                    .map(
-                      (task) => Padding(
-                        padding: const EdgeInsets.only(bottom: 9),
-                        child: _TaskAttentionTile(
-                          task: task,
-                          member: _memberFor(members, task.assigneeId),
-                          onTap: () => onOpenTask(task),
-                        ),
-                      ),
-                    ),
-              const SizedBox(height: 8),
-              if (tasks.isEmpty)
-                FilledButton.icon(
-                  onPressed: onAddTask,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Create your first task'),
-                ),
-            ]),
+            ],
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: .1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(width: 12),
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: progress),
+          duration: const Duration(milliseconds: 1100),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, _) => SizedBox(
+            width: 92,
+            height: 92,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                SizedBox.expand(
+                  child: CircularProgressIndicator(
+                    value: value,
+                    strokeWidth: 9,
+                    strokeCap: StrokeCap.round,
+                    color: Colors.white,
+                    backgroundColor: Colors.white24,
+                  ),
                 ),
                 Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  '${(value * 100).round()}%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }
 
-class _TaskAttentionTile extends StatelessWidget {
-  const _TaskAttentionTile({
-    required this.task,
-    required this.member,
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
     required this.onTap,
   });
-  final ProjectTask task;
-  final TeamMember? member;
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => Card(
-    child: ListTile(
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-      title: Text(
-        task.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w700),
-      ),
-      subtitle: Text(
-        '${member?.name ?? 'Unassigned'}  ·  Due ${_shortDate(task.deadline)}',
-      ),
-      trailing: SlaBadge(status: SlaService.calculate(task)),
-    ),
-  );
-}
-
-class SlaBadge extends StatelessWidget {
-  const SlaBadge({super.key, required this.status});
-  final SlaStatus status;
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (status) {
-      SlaStatus.onTrack => const Color(0xFF20826F),
-      SlaStatus.atRisk => const Color(0xFFB66C0C),
-      SlaStatus.overdue => const Color(0xFFBB414A),
-      SlaStatus.completed => const Color(0xFF526A9C),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        SlaService.label(status),
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyCard extends StatelessWidget {
-  const _EmptyCard({required this.icon, required this.message});
+  final String label;
+  final int value;
   final IconData icon;
-  final String message;
+  final Color color;
+  final VoidCallback onTap;
+
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
+  Widget build(BuildContext context) => Pressable(
+    onTap: onTap,
+    borderRadius: 24,
+    child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.soft(color, alpha: context.isDark ? .16 : .14),
+        borderRadius: BorderRadius.circular(24),
+        border: context.isDark
+            ? Border.all(color: color.withValues(alpha: .25))
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: AppTheme.teal),
-          const SizedBox(width: 12),
-          Expanded(child: Text(message)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(icon, color: color, size: 24),
+              Icon(Icons.arrow_outward_rounded, size: 18, color: color),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: value.toDouble()),
+                duration: const Duration(milliseconds: 700),
+                curve: Curves.easeOutCubic,
+                builder: (_, v, _) => Text(
+                  '${v.round()}',
+                  style: TextStyle(
+                    fontSize: 28,
+                    height: 1.1,
+                    fontWeight: FontWeight.w800,
+                    color: context.scheme.onSurface,
+                  ),
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: context.scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     ),
   );
-}
-
-String _shortDate(DateTime date) => '${date.day}/${date.month}';
-
-TeamMember? _memberFor(List<TeamMember> members, int? id) {
-  for (final member in members) {
-    if (member.id == id) return member;
-  }
-  return null;
 }
