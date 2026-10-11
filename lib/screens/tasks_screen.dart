@@ -24,6 +24,7 @@ class TasksScreen extends StatefulWidget {
     required this.filter,
     required this.onFilterChanged,
     required this.onOpenTask,
+    required this.onEditTask,
     required this.onToggleTask,
     required this.onAddTask,
   });
@@ -32,6 +33,7 @@ class TasksScreen extends StatefulWidget {
   final String filter;
   final ValueChanged<String> onFilterChanged;
   final ValueChanged<ProjectTask> onOpenTask;
+  final ValueChanged<ProjectTask> onEditTask;
   final ValueChanged<ProjectTask> onToggleTask;
   final VoidCallback onAddTask;
 
@@ -150,6 +152,7 @@ class _TasksScreenState extends State<TasksScreen> {
                           task: task,
                           member: memberFor(widget.members, task.assigneeId),
                           onTap: () => widget.onOpenTask(task),
+                          onEdit: () => widget.onEditTask(task),
                           onToggle: () => widget.onToggleTask(task),
                         ),
                       );
