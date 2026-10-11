@@ -86,3 +86,56 @@ class AppTheme {
     ),
   );
 }
+
+// Accent colors used by badges and icons, one set per brightness.
+class AppColors {
+  const AppColors({
+    required this.violet,
+    required this.success,
+    required this.warning,
+    required this.danger,
+    required this.info,
+    required this.pink,
+  });
+
+  final Color violet;
+  final Color success;
+  final Color warning;
+  final Color danger;
+  final Color info;
+  final Color pink;
+
+  List<Color> get palette => [violet, info, success, warning, pink, danger];
+
+  static const light = AppColors(
+    violet: Color(0xFF6C4CF1),
+    success: Color(0xFF0F9F78),
+    warning: Color(0xFFD97706),
+    danger: Color(0xFFE0383E),
+    info: Color(0xFF2F7DF6),
+    pink: Color(0xFFD6409F),
+  );
+
+  static const dark = AppColors(
+    violet: Color(0xFFA08DFF),
+    success: Color(0xFF3DD6A3),
+    warning: Color(0xFFFFB020),
+    danger: Color(0xFFFF6B70),
+    info: Color(0xFF6AA5FF),
+    pink: Color(0xFFFF7EC6),
+  );
+}
+
+// Short names so screens can write context.scheme instead of Theme.of(context).
+extension AppThemeContext on BuildContext {
+  ColorScheme get scheme => Theme.of(this).colorScheme;
+  TextTheme get text => Theme.of(this).textTheme;
+  bool get isDark => Theme.of(this).brightness == Brightness.dark;
+  AppColors get colors => isDark ? AppColors.dark : AppColors.light;
+
+  // A light tint of an accent color that works on the card surface.
+  Color soft(Color accent, {double? alpha}) => Color.alphaBlend(
+    accent.withValues(alpha: alpha ?? (isDark ? .18 : .12)),
+    scheme.surface,
+  );
+}
