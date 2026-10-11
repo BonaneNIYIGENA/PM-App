@@ -125,6 +125,15 @@ class TeamScreen extends StatelessWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context, TeamMember member) async {
+    // Last-member guard: the workspace must always keep at least one person
+    if (members.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You can’t remove the last team member.'),
+        ),
+      );
+      return;
+    }
     final assigned = tasks.where((task) => task.assigneeId == member.id).length;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -151,62 +160,64 @@ class TeamScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.fromLTRB(20, 4, 20, 130),
-    children: [
-      FadeSlideIn(
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                '${members.length} ${members.length == 1 ? 'person' : 'people'} in your workspace',
-                style: TextStyle(color: context.scheme.onSurfaceVariant),
-              ),
-            ),
-            FilledButton.tonalIcon(
-              onPressed: () => _editMember(context),
-              icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
-              label: const Text('Add'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                backgroundColor: context.soft(
-                  context.scheme.primary,
-                  alpha: .16,
-                ),
-                foregroundColor: context.scheme.primary,
-              ),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 14),
-      if (members.isEmpty)
-        const EmptyState(
-          icon: Icons.groups_outlined,
-          title: 'No team members yet',
-          message: 'Add someone to assign tasks.',
-        ),
-      for (var i = 0; i < members.length; i++)
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 130),
+      children: [
         FadeSlideIn(
-          key: ValueKey(members[i].id),
-          index: i + 1,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _MemberCard(
-              member: members[i],
-              openTasks: tasks
-                  .where((t) => t.assigneeId == members[i].id && !t.isCompleted)
-                  .length,
-              totalTasks: tasks
-                  .where((t) => t.assigneeId == members[i].id)
-                  .length,
-              onEdit: () => _editMember(context, members[i]),
-              onDelete: () => _confirmDelete(context, members[i]),
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${members.length} ${members.length == 1 ? 'person' : 'people'} in your workspace',
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: () => _editMember(context),
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
+                label: const Text('Add'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  backgroundColor: scheme.primary.withValues(alpha: .16),
+                  foregroundColor: scheme.primary,
+                ),
+              ),
+            ],
           ),
         ),
-    ],
-  );
+        const SizedBox(height: 14),
+        if (members.isEmpty)
+          const EmptyState(
+            icon: Icons.groups_outlined,
+            title: 'No team members yet',
+            message: 'Add someone to assign tasks.',
+          ),
+        for (var i = 0; i < members.length; i++)
+          FadeSlideIn(
+            key: ValueKey(members[i].id),
+            index: i + 1,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _MemberCard(
+                member: members[i],
+                openTasks: tasks
+                    .where(
+                      (t) => t.assigneeId == members[i].id && !t.isCompleted,
+                    )
+                    .length,
+                totalTasks: tasks
+                    .where((t) => t.assigneeId == members[i].id)
+                    .length,
+                onEdit: () => _editMember(context, members[i]),
+                onDelete: () => _confirmDelete(context, members[i]),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _MemberCard extends StatelessWidget {
@@ -225,6 +236,7 @@ class _MemberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final done = totalTasks == 0 ? 0.0 : (totalTasks - openTasks) / totalTasks;
     return AppCard(
       onTap: onEdit,
@@ -248,7 +260,7 @@ class _MemberCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   member.role,
-                  style: TextStyle(color: context.scheme.onSurfaceVariant),
+                  style: TextStyle(color: scheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -263,9 +275,9 @@ class _MemberCard extends StatelessWidget {
                           builder: (_, v, _) => LinearProgressIndicator(
                             value: v,
                             minHeight: 6,
-                            color: context.colors.success,
-                            backgroundColor: context.soft(
-                              context.colors.success,
+                            color: AppTheme.teal,
+                            backgroundColor: AppTheme.teal.withValues(
+                              alpha: .15,
                             ),
                           ),
                         ),
@@ -277,7 +289,7 @@ class _MemberCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: context.scheme.onSurfaceVariant,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -287,10 +299,7 @@ class _MemberCard extends StatelessWidget {
           ),
           PopupMenuButton<String>(
             tooltip: 'Options',
-            icon: Icon(
-              Icons.more_vert_rounded,
-              color: context.scheme.onSurfaceVariant,
-            ),
+            icon: Icon(Icons.more_vert_rounded, color: scheme.onSurfaceVariant),
             onSelected: (value) => value == 'edit' ? onEdit() : onDelete(),
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'edit', child: Text('Edit')),
