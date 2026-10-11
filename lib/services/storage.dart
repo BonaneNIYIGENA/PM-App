@@ -19,7 +19,7 @@ class StorageService {
       final db = await factory.openDatabase(
         await databasePathForCurrentPlatform(),
         options: OpenDatabaseOptions(
-          version: 3,
+          version: 4,
           onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
           onCreate: (db, version) async {
             await db.execute('''
@@ -48,6 +48,7 @@ class StorageService {
               'CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
             );
             await _createActivityTable(db);
+            await _createRolesTable(db);
           },
           onUpgrade: (db, oldVersion, newVersion) async {
             if (oldVersion < 2) {
@@ -56,6 +57,7 @@ class StorageService {
               );
             }
             if (oldVersion < 3) await _createActivityTable(db);
+            if (oldVersion < 4) await _createRolesTable(db);
           },
         ),
       );
@@ -78,6 +80,20 @@ class StorageService {
       is_read INTEGER NOT NULL DEFAULT 0
     )
   ''');
+
+  Future<void> _createRolesTable(Database db) async {
+    await db.execute('''
+    CREATE TABLE IF NOT EXISTS roles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE COLLATE NOCASE
+    )
+  ''');
+    for (final role in defaultRoles) {
+      await db.insert('roles', {
+        'name': role,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
+    }
+  }
 
   Future<void> _seedIfEmpty(Database db) async {
     final initialized = await db.query(
@@ -221,9 +237,6 @@ class StorageService {
 
   Future<bool> loadDarkMode() => _loadPreference('dark_mode');
 
-  Future<bool> loadNotificationsEnabled() =>
-      _loadPreference('notifications_enabled');
-
   Future<bool> _loadPreference(String key) async {
     final db = await database;
     final rows = await db.query(
@@ -238,9 +251,6 @@ class StorageService {
 
   Future<void> saveDarkMode(bool enabled) =>
       _savePreference('dark_mode', enabled);
-
-  Future<void> saveNotificationsEnabled(bool enabled) =>
-      _savePreference('notifications_enabled', enabled);
 
   Future<void> _savePreference(String key, bool enabled) async {
     final db = await database;
@@ -275,31 +285,16 @@ class StorageService {
     await db.delete('activity');
   }
 
-  Future<String?> loadSessionEmail() async {
+  Future<List<String>> loadRoles() async {
     final db = await database;
-    final rows = await db.query(
-      'app_meta',
-      columns: ['value'],
-      where: 'key = ?',
-      whereArgs: ['session_email'],
-      limit: 1,
-    );
-    return rows.isEmpty ? null : rows.first['value'] as String;
+    final rows = await db.query('roles', orderBy: 'id');
+    return rows.map((row) => row['name'] as String).toList();
   }
 
-  Future<void> saveSessionEmail(String? email) async {
+  Future<void> addRole(String name) async {
     final db = await database;
-    if (email == null) {
-      await db.delete(
-        'app_meta',
-        where: 'key = ?',
-        whereArgs: ['session_email'],
-      );
-      return;
-    }
-    await db.insert('app_meta', {
-      'key': 'session_email',
-      'value': email,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('roles', {
+      'name': name,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 }

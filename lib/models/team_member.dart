@@ -1,3 +1,12 @@
+// Roles every workspace starts with. More can be added and are stored in SQLite.
+const defaultRoles = [
+  'Project lead',
+  'Flutter developer',
+  'UI designer',
+  'QA engineer',
+  'Team member',
+];
+
 class TeamMember {
   const TeamMember({
     this.id,
