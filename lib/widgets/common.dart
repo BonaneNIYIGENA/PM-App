@@ -68,7 +68,7 @@ Color slaColor(BuildContext context, SlaStatus status) => switch (status) {
   SlaStatus.onTrack => context.colors.success,
   SlaStatus.atRisk => context.colors.warning,
   SlaStatus.overdue => context.colors.danger,
-  SlaStatus.completed => context.colors.violet,
+  SlaStatus.completed => context.colors.info,
 };
 
 /// Scales down on press and tints on hover.
@@ -79,12 +79,15 @@ class Pressable extends StatefulWidget {
     this.onTap,
     this.borderRadius = 20,
     this.scale = .97,
+    this.tint = true,
   });
 
   final Widget child;
   final VoidCallback? onTap;
   final double borderRadius;
   final double scale;
+  // Turn off for items that draw their own highlight (like nav bar icons).
+  final bool tint;
 
   @override
   State<Pressable> createState() => _PressableState();
@@ -98,7 +101,7 @@ class _PressableState extends State<Pressable> {
   Widget build(BuildContext context) {
     final primary = context.scheme.primary;
     final enabled = widget.onTap != null;
-    final tint = !enabled
+    final tint = !enabled || !widget.tint
         ? Colors.transparent
         : _down
         ? primary.withValues(alpha: .12)
@@ -219,9 +222,9 @@ class AppCard extends StatelessWidget {
             ? null
             : [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: .06),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
+                  color: Colors.black.withValues(alpha: .05),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
                 ),
               ],
       ),
@@ -450,4 +453,175 @@ class EmptyState extends StatelessWidget {
       ),
     ),
   );
+}
+
+// One line of an icon, a small label and a value, used in expanded cards.
+class InfoLine extends StatelessWidget {
+  const InfoLine({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = context.scheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: muted),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 86,
+            child: Text(label, style: TextStyle(color: muted, fontSize: 12.5)),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Opens a form as a bottom sheet with a drag handle: swipe down to close.
+Future<T?> showFormSheet<T>(BuildContext context, WidgetBuilder builder) =>
+    showModalBottomSheet<T>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: builder,
+    );
+
+// A label above a field, with a red star for required fields.
+class FormLabel extends StatelessWidget {
+  const FormLabel(this.text, {super.key, this.required = false});
+  final String text;
+  final bool required;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      children: [
+        Text(
+          text,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+        ),
+        if (required)
+          Text(' *', style: TextStyle(color: context.colors.danger)),
+      ],
+    ),
+  );
+}
+
+// A confirmation shown as a bottom sheet. Resolves to true when confirmed.
+Future<bool> showConfirmSheet(
+  BuildContext context, {
+  required IconData icon,
+  required String title,
+  required String message,
+  required String confirmLabel,
+}) async {
+  final confirmed = await showFormSheet<bool>(
+    context,
+    (_) => _ConfirmSheet(
+      icon: icon,
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+    ),
+  );
+  return confirmed == true;
+}
+
+class _ConfirmSheet extends StatelessWidget {
+  const _ConfirmSheet({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+  });
+  final IconData icon;
+  final String title;
+  final String message;
+  final String confirmLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final danger = context.colors.danger;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: context.soft(danger, alpha: .16),
+            ),
+            child: Icon(icon, color: danger, size: 28),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: context.text.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: context.scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                    backgroundColor: danger,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(confirmLabel),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
