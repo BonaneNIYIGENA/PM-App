@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 
-import 'services/notifications_service.dart';
 import 'services/storage.dart';
 import 'screens/home.dart';
 import 'theme/apptheme.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await NotificationsService.initialize();
-  } catch (_) {
-    // The rest of the app remains usable if this device lacks notifications.
-  }
   runApp(const ProjectTrackerApp());
 }
 

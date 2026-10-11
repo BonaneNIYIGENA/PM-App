@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import '../models/app_notification.dart';
 import '../models/tasks.dart';
 import '../models/team_member.dart';
-import '../services/notifications_service.dart';
 import '../services/sla_service.dart';
 import '../services/storage.dart';
 import '../theme/apptheme.dart';
 import '../widgets/common.dart';
 import '../widgets/floating_nav_bar.dart';
+import '../widgets/taskms_logo.dart';
 import 'auth_screen.dart';
 import 'dashboard_screen.dart';
 import 'notifications_screen.dart';
@@ -38,11 +38,11 @@ class _HomeScreenState extends State<HomeScreen> {
   final _activities = ValueNotifier<List<AppNotification>>([]);
   List<ProjectTask> _tasks = [];
   List<TeamMember> _members = [];
+  List<String> _roles = defaultRoles;
   TeamMember? _currentMember;
   int _tab = 0;
   String _taskFilter = 'All';
   bool _loading = true;
-  bool _notificationsEnabled = false;
   String? _error;
 
   @override
@@ -62,28 +62,16 @@ class _HomeScreenState extends State<HomeScreen> {
       final results = await Future.wait([
         _storage.loadTasks(),
         _storage.loadMembers(),
-        _storage.loadNotificationsEnabled(),
         _storage.loadActivities(),
-        _storage.loadSessionEmail(),
+        _storage.loadRoles(),
       ]);
       if (!mounted) return;
       final members = results[1] as List<TeamMember>;
-      final sessionEmail = (results[4] as String?)?.toLowerCase();
-      TeamMember? restored;
-      if (sessionEmail != null) {
-        for (final member in members) {
-          if (member.email.trim().toLowerCase() == sessionEmail) {
-            restored = member;
-            break;
-          }
-        }
-      }
-      _activities.value = results[3] as List<AppNotification>;
+      _activities.value = results[2] as List<AppNotification>;
       setState(() {
         _tasks = results[0] as List<ProjectTask>;
         _members = members;
-        _notificationsEnabled = results[2] as bool;
-        _currentMember = restored;
+        _roles = results[3] as List<String>;
         _loading = false;
         _error = null;
       });
@@ -166,12 +154,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<ProjectTask?> _createOrEditTask([ProjectTask? task]) async {
-    final saved = await Navigator.of(context).push<ProjectTask>(
-      MaterialPageRoute(
-        builder: (_) => TaskFormScreen(task: task, members: _members),
-      ),
+    final saved = await showFormSheet<ProjectTask>(
+      context,
+      (_) => TaskFormScreen(task: task, members: _members),
     );
     if (saved == null) return null;
+    return _persistTask(saved, task);
+  }
+
+  // Saves a task from the form and records the activity. `task` is the
+  // original when editing, or null when creating.
+  Future<ProjectTask?> _persistTask(
+    ProjectTask saved,
+    ProjectTask? task,
+  ) async {
     try {
       final id = await _storage.saveTask(saved);
       await _refresh();
@@ -202,13 +198,6 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
         _toast('Changes saved');
-      }
-      if (_notificationsEnabled) {
-        try {
-          await NotificationsService.remindAboutTask(stored);
-        } catch (_) {
-          _showStorageError('set a reminder for the task');
-        }
       }
       return stored;
     } catch (_) {
@@ -244,17 +233,6 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
       }
-      if (_notificationsEnabled) {
-        try {
-          if (updated.isCompleted) {
-            await NotificationsService.cancelTaskReminder(updated);
-          } else {
-            await NotificationsService.remindAboutTask(updated);
-          }
-        } catch (_) {
-          _showStorageError('update the task reminder');
-        }
-      }
       await _refresh();
     } catch (_) {
       _showStorageError('update the task');
@@ -277,11 +255,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _deleteTask(ProjectTask task) async {
     try {
       await _storage.deleteTask(task.id!);
-      try {
-        await NotificationsService.cancelTaskReminder(task);
-      } catch (_) {
-        // The task should still be deleted if notifications fail.
-      }
       await _log('deleted', 'Task deleted', '$_actor deleted “${task.title}”.');
       await _refresh();
       _toast('Task deleted', icon: Icons.delete_outline_rounded);
@@ -292,15 +265,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openTask(ProjectTask task) async {
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => TaskDetailsScreen(
-          task: task,
-          members: _members,
-          onEdit: _createOrEditTask,
-          onUpdate: _updateTask,
-          onDelete: _deleteTask,
-        ),
+    await showFormSheet<void>(
+      context,
+      (_) => TaskDetailsScreen(
+        task: task,
+        members: _members,
+        onSave: _persistTask,
+        onUpdate: _updateTask,
+        onDelete: _deleteTask,
       ),
     );
     await _refresh();
@@ -319,6 +291,16 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
     await _markAllRead();
+  }
+
+  Future<void> _addRole(String name) async {
+    try {
+      await _storage.addRole(name);
+      final roles = await _storage.loadRoles();
+      if (mounted) setState(() => _roles = roles);
+    } catch (_) {
+      _showStorageError('add the role');
+    }
   }
 
   Future<void> _saveMember(TeamMember member) async {
@@ -371,9 +353,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _signIn(TeamMember member) async {
-    try {
-      await _storage.saveSessionEmail(member.email.trim().toLowerCase());
-    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _currentMember = member;
@@ -424,38 +403,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _signOut() async {
-    try {
-      await _storage.saveSessionEmail(null);
-    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _currentMember = null;
       _tab = 0;
     });
-  }
-
-  Future<void> _setNotificationsEnabled(bool enabled) async {
-    try {
-      if (enabled) {
-        final granted = await NotificationsService.requestPermission();
-        if (!granted) {
-          _toast(
-            'Notification permission was not granted.',
-            icon: Icons.notifications_off_outlined,
-          );
-          return;
-        }
-      } else {
-        await NotificationsService.cancelAllReminders();
-      }
-      await _storage.saveNotificationsEnabled(enabled);
-      if (mounted) setState(() => _notificationsEnabled = enabled);
-    } catch (_) {
-      _toast(
-        'Could not update notification settings.',
-        icon: Icons.error_outline_rounded,
-      );
-    }
   }
 
   void _showStorageError(String action) {
@@ -478,19 +430,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: context.scheme.primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  Icons.task_alt_rounded,
-                  color: context.scheme.onPrimary,
-                  size: 32,
-                ),
-              ),
+              const TaskMsLogo(size: 96),
               const SizedBox(height: 24),
               const SizedBox(
                 width: 24,
@@ -524,6 +464,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ? AuthScreen(
               key: const ValueKey('auth'),
               members: _members,
+              roles: _roles,
+              onAddRole: _addRole,
               onSignIn: _signIn,
               onRegister: _registerAccount,
             )
@@ -543,6 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
         tasks: _tasks,
         members: _members,
         onOpenTask: _openTask,
+        onEditTask: _createOrEditTask,
         onToggleTask: _toggleTask,
         onAddTask: () => _createOrEditTask(),
         onShowTasks: _showTasks,
@@ -553,11 +496,14 @@ class _HomeScreenState extends State<HomeScreen> {
         filter: _taskFilter,
         onFilterChanged: (value) => setState(() => _taskFilter = value),
         onOpenTask: _openTask,
+        onEditTask: _createOrEditTask,
         onToggleTask: _toggleTask,
         onAddTask: () => _createOrEditTask(),
       ),
       TeamScreen(
         members: _members,
+        roles: _roles,
+        onAddRole: _addRole,
         tasks: _tasks,
         onSave: _saveMember,
         onDelete: _deleteMember,
@@ -565,10 +511,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ProfileScreen(
         member: me,
         onSignOut: _signOut,
+        members: _members,
+        roles: _roles,
+        onAddRole: _addRole,
+        tasks: _tasks,
+        onUpdate: _saveMember,
         isDarkMode: widget.isDarkMode,
         onDarkModeChanged: widget.onDarkModeChanged,
-        notificationsEnabled: _notificationsEnabled,
-        onNotificationsChanged: _setNotificationsEnabled,
         onOpenNotifications: _openNotifications,
       ),
     ];

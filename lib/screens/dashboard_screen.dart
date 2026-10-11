@@ -14,6 +14,7 @@ class DashboardScreen extends StatelessWidget {
     required this.tasks,
     required this.members,
     required this.onOpenTask,
+    required this.onEditTask,
     required this.onToggleTask,
     required this.onAddTask,
     required this.onShowTasks,
@@ -22,6 +23,7 @@ class DashboardScreen extends StatelessWidget {
   final List<ProjectTask> tasks;
   final List<TeamMember> members;
   final ValueChanged<ProjectTask> onOpenTask;
+  final ValueChanged<ProjectTask> onEditTask;
   final ValueChanged<ProjectTask> onToggleTask;
   final VoidCallback onAddTask;
   final ValueChanged<String> onShowTasks;
@@ -147,6 +149,7 @@ class DashboardScreen extends StatelessWidget {
                   task: attention[i],
                   member: memberFor(members, attention[i].assigneeId),
                   onTap: () => onOpenTask(attention[i]),
+                  onEdit: () => onEditTask(attention[i]),
                   onToggle: () => onToggleTask(attention[i]),
                 ),
               ),
@@ -176,11 +179,11 @@ class _HeroCard extends StatelessWidget {
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xFF5B3BEA), Color(0xFF9A7BFF)],
+        colors: [Color(0xFFE8590C), Color(0xFFFF9248)],
       ),
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFF6C4CF1)
+          color: const Color(0xFFF97316)
               .withValues(alpha: context.isDark ? .25 : .35),
           blurRadius: 26,
           offset: const Offset(0, 12),
@@ -204,7 +207,7 @@ class _HeroCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 '$completed of $total tasks completed',
-                style: const TextStyle(color: Color(0xFFEDE8FF), height: 1.3),
+                style: const TextStyle(color: Color(0xFFFFEDE0), height: 1.3),
               ),
               const SizedBox(height: 16),
               Pressable(
@@ -225,13 +228,13 @@ class _HeroCard extends StatelessWidget {
                       Icon(
                         Icons.insights_rounded,
                         size: 18,
-                        color: Color(0xFF4B2FD0),
+                        color: Color(0xFFC2410C),
                       ),
                       SizedBox(width: 6),
                       Text(
                         'View insights',
                         style: TextStyle(
-                          color: Color(0xFF4B2FD0),
+                          color: Color(0xFFC2410C),
                           fontWeight: FontWeight.w800,
                         ),
                       ),
