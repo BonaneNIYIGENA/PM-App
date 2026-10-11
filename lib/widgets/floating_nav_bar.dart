@@ -86,8 +86,9 @@ class _AddButton extends StatelessWidget {
       message: 'New task',
       child: Pressable(
         onTap: onTap,
-        borderRadius: 24,
+        borderRadius: 28,
         scale: .9,
+        tint: false,
         child: Container(
           width: 56,
           height: 56,
@@ -113,7 +114,7 @@ class _AddButton extends StatelessWidget {
   );
 }
 
-class _NavItem extends StatelessWidget {
+class _NavItem extends StatefulWidget {
   const _NavItem({
     required this.icon,
     required this.selectedIcon,
@@ -128,34 +129,52 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
+    final icon = widget.icon;
+    final selectedIcon = widget.selectedIcon;
+    final label = widget.label;
+    final selected = widget.selected;
     final primary = context.scheme.primary;
     return Semantics(
       button: true,
       selected: selected,
       label: label,
       child: Pressable(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: 20,
         scale: .92,
+        tint: false,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              width: selected ? 46 : 34,
-              height: 30,
-              decoration: BoxDecoration(
-                color: selected
-                    ? context.soft(primary, alpha: .16)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(
-                selected ? selectedIcon : icon,
-                size: 22,
-                color: selected ? primary : context.scheme.onSurfaceVariant,
+            MouseRegion(
+              onEnter: (_) => setState(() => _hover = true),
+              onExit: (_) => setState(() => _hover = false),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                width: selected ? 46 : 34,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? context.soft(primary, alpha: .16)
+                      : _hover
+                      ? context.soft(primary, alpha: .08)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Icon(
+                  selected ? selectedIcon : icon,
+                  size: 22,
+                  color: selected ? primary : context.scheme.onSurfaceVariant,
+                ),
               ),
             ),
             const SizedBox(height: 2),
