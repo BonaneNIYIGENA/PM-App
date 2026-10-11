@@ -274,4 +274,32 @@ class StorageService {
     final db = await database;
     await db.delete('activity');
   }
+
+  Future<String?> loadSessionEmail() async {
+    final db = await database;
+    final rows = await db.query(
+      'app_meta',
+      columns: ['value'],
+      where: 'key = ?',
+      whereArgs: ['session_email'],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['value'] as String;
+  }
+
+  Future<void> saveSessionEmail(String? email) async {
+    final db = await database;
+    if (email == null) {
+      await db.delete(
+        'app_meta',
+        where: 'key = ?',
+        whereArgs: ['session_email'],
+      );
+      return;
+    }
+    await db.insert('app_meta', {
+      'key': 'session_email',
+      'value': email,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
 }
