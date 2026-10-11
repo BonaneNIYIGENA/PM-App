@@ -1,28 +1,26 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../models/team_member.dart';
 import '../theme/apptheme.dart';
+import '../utils/validators.dart';
 import '../widgets/common.dart';
-
-enum _Step { email, signingIn, create }
-
-const _roles = [
-  'Project lead',
-  'Flutter developer',
-  'UI designer',
-  'QA engineer',
-  'Team member',
-];
+import '../widgets/member_form_sheet.dart';
+import '../widgets/taskms_logo.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({
     super.key,
     required this.members,
+    required this.roles,
+    required this.onAddRole,
     required this.onSignIn,
     required this.onRegister,
   });
 
   final List<TeamMember> members;
+  final List<String> roles;
+  final Future<void> Function(String name) onAddRole;
   final ValueChanged<TeamMember> onSignIn;
   final Future<void> Function(String name, String email, String role)
   onRegister;
@@ -32,327 +30,369 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final _emailForm = GlobalKey<FormState>();
-  final _createForm = GlobalKey<FormState>();
-  final _email = TextEditingController();
-  final _name = TextEditingController();
-  _Step _step = _Step.email;
-  TeamMember? _match;
-  String _role = _roles.last;
-  bool _busy = false;
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _email = TextEditingController();
+  bool _notFound = false;
+  bool _creating = false;
+  bool _fromUnknownEmail = false;
+  bool _saving = false;
+  String? _prefillEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    _email.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
+    _createLink.dispose();
     _email.dispose();
-    _name.dispose();
     super.dispose();
   }
 
-  void _continue() {
-    if (!_emailForm.currentState!.validate()) return;
-    FocusScope.of(context).unfocus();
-    final email = _email.text.trim().toLowerCase();
-    TeamMember? found;
+  String get _typed => _email.text.trim().toLowerCase();
+
+  bool get _emailValid => Validators.email(_typed) == null;
+
+  TeamMember? _findMember() {
     for (final member in widget.members) {
-      if (member.email.trim().toLowerCase() == email) {
-        found = member;
-        break;
-      }
+      if (member.email.trim().toLowerCase() == _typed) return member;
     }
-    if (found == null) {
-      setState(() => _step = _Step.create);
+    return null;
+  }
+
+  void _signIn() {
+    if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+    final member = _findMember();
+    if (member == null) {
+      // Unknown email: only tell the user. They choose to create an account.
+      setState(() => _notFound = true);
       return;
     }
+    widget.onSignIn(member);
+  }
+
+  // Swaps the sign-in form for the create-account form, keeping the email.
+  void _startCreating({bool unknownEmail = false}) {
+    FocusScope.of(context).unfocus();
     setState(() {
-      _match = found;
-      _step = _Step.signingIn;
+      _creating = true;
+      _fromUnknownEmail = unknownEmail;
+      _prefillEmail = _emailValid ? _email.text.trim() : null;
     });
-    widget.onSignIn(found);
   }
 
-  Future<void> _create() async {
-    if (!_createForm.currentState!.validate()) return;
-    setState(() => _busy = true);
-    await widget.onRegister(_name.text.trim(), _email.text.trim(), _role);
-    if (mounted) setState(() => _busy = false);
+  void _backToSignIn() => setState(() => _creating = false);
+
+  // The "click here" text in the not-registered message.
+  late final TapGestureRecognizer _createLink = TapGestureRecognizer()
+    ..onTap = () => _startCreating(unknownEmail: true);
+
+  // The shell saves the member and signs them in right away.
+  Future<void> _register(TeamMember created) async {
+    setState(() => _saving = true);
+    await widget.onRegister(created.name, created.email, created.role);
+    if (mounted) setState(() => _saving = false);
   }
 
-  void _backToEmail() => setState(() {
-    _step = _Step.email;
-    _match = null;
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
-    final gradient = dark
-        ? const [Color(0xFF0F1626), Color(0xFF263B68)]
-        : const [AppTheme.navy, AppTheme.teal];
-    return Scaffold(
-      backgroundColor: dark ? const Color(0xFF0F1626) : AppTheme.navy,
-      body: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradient,
+  Widget _signInView(
+    BuildContext context, {
+    required Color danger,
+    required Color orange,
+    required bool dark,
+    required OutlineInputBorder redBorder,
+  }) {
+    final scheme = context.scheme;
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _Heading(),
+          const SizedBox(height: 22),
+          const FormLabel('Email address'),
+          TextFormField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.go,
+            onChanged: (_) {
+              if (_notFound) {
+                setState(() => _notFound = false);
+              }
+            },
+            onFieldSubmitted: (_) => _signIn(),
+            decoration: InputDecoration(
+              hintText: 'name@example.com',
+              prefixIcon: const Icon(Icons.mail_outline_rounded),
+              suffixIcon: _notFound
+                  ? Icon(Icons.error_rounded, color: danger)
+                  : null,
+              enabledBorder: _notFound ? redBorder : null,
+              focusedBorder: _notFound ? redBorder : null,
+            ),
+            validator: Validators.email,
           ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: CustomScrollView(
-                slivers: [
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Column(
-                      children: [
-                        _Hero(compact: _step != _Step.email),
-                        Expanded(
-                          child: Container(
-                            width: double.infinity,
-                            padding: EdgeInsets.fromLTRB(
-                              24,
-                              28,
-                              24,
-                              24 + MediaQuery.of(context).padding.bottom,
-                            ),
-                            decoration: BoxDecoration(
-                              color: scheme.surface,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(36),
-                              ),
-                              border: dark
-                                  ? Border(
-                                      top: BorderSide(
-                                        color: scheme.outlineVariant,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 350),
-                              switchInCurve: Curves.easeOutCubic,
-                              transitionBuilder: (child, animation) =>
-                                  FadeTransition(
-                                    opacity: animation,
-                                    child: SlideTransition(
-                                      position: Tween(
-                                        begin: const Offset(.06, 0),
-                                        end: Offset.zero,
-                                      ).animate(animation),
-                                      child: child,
-                                    ),
-                                  ),
-                              child: SingleChildScrollView(
-                                key: ValueKey(_step),
-                                physics: const NeverScrollableScrollPhysics(),
-                                child: switch (_step) {
-                                  _Step.email => _emailStep(context),
-                                  _Step.signingIn => _signingInStep(context),
-                                  _Step.create => _createStep(context),
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+          if (_notFound) ...[
+            const SizedBox(height: 8),
+            Text(
+              'This email is not registered.',
+              style: TextStyle(
+                color: danger,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text.rich(
+              TextSpan(
+                style: TextStyle(color: danger, fontSize: 12.5),
+                children: [
+                  const TextSpan(text: 'New to taskMS? '),
+                  TextSpan(
+                    text: 'Click here to create an account.',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.underline,
                     ),
+                    recognizer: _createLink,
                   ),
                 ],
               ),
             ),
+          ],
+          const SizedBox(height: 22),
+          FilledButton.icon(
+            onPressed: _saving ? null : _signIn,
+            iconAlignment: IconAlignment.end,
+            icon: _saving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.arrow_forward_rounded, size: 20),
+            label: Text(_saving ? 'Creating account' : 'Sign in'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(54),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              backgroundColor: dark ? orange : AppTheme.ink,
+              foregroundColor: dark ? Colors.black : Colors.white,
+            ),
           ),
-        ),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              const Expanded(child: Divider()),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'New to taskMS?',
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+              const Expanded(child: Divider()),
+            ],
+          ),
+          const SizedBox(height: 22),
+          OutlinedButton(
+            onPressed: _startCreating,
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(54),
+              foregroundColor: orange,
+              side: BorderSide(color: orange, width: 1.4),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const Text('Create an account'),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _emailStep(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    return Column(
-      key: const ValueKey('email'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Welcome to taskMS',
-          style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Enter your email to sign in. New here? We’ll set up your account in a moment.',
-          style: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
-        ),
-        const SizedBox(height: 22),
-        Form(
-          key: _emailForm,
-          child: TextFormField(
-            controller: _email,
-            keyboardType: TextInputType.emailAddress,
-            autofillHints: const [AutofillHints.email],
-            textInputAction: TextInputAction.go,
-            decoration: const InputDecoration(
-              labelText: 'Email address',
-              prefixIcon: Icon(Icons.alternate_email_rounded),
-            ),
-            validator: (value) {
-              final email = value?.trim() ?? '';
-              if (email.isEmpty) return 'Enter your email';
-              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-                return 'Enter a valid email address.';
-              }
-              return null;
-            },
-            onFieldSubmitted: (_) => _continue(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: _continue,
-            icon: const Icon(Icons.arrow_forward_rounded),
-            iconAlignment: IconAlignment.end,
-            label: const Text('Continue'),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Center(
-          child: Text(
-            'Accounts are stored on this device only.',
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _createView(BuildContext context) => MemberFormSheet(
+    key: const ValueKey('create'),
+    title: 'Create your account',
+    submitLabel: 'Create account',
+    subtitle: _fromUnknownEmail
+        ? 'This email is not registered yet. Create your account to continue.'
+        : 'Tell us who you are so tasks can be assigned to you.',
+    members: widget.members,
+    roles: widget.roles,
+    onAddRole: widget.onAddRole,
+    initialEmail: _prefillEmail,
+    emailTakenMessage: 'An account with this email already exists.',
+    busy: _saving,
+    onSubmit: _register,
+    footer: TextButton(
+      onPressed: _saving ? null : _backToSignIn,
+      child: const Text('Already have an account? Sign in'),
+    ),
+  );
 
-  Widget _signingInStep(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    final member = _match!;
-    return Column(
-      key: const ValueKey('signing'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(height: 8),
-        TweenAnimationBuilder<double>(
-          tween: Tween(begin: .6, end: 1),
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeOutBack,
-          builder: (_, value, child) =>
-              Transform.scale(scale: value, child: child),
-          child: MemberAvatar(member: member, radius: 38),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Welcome back, ${member.name.split(' ').first}!',
-          style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 4),
-        Text(member.role, style: TextStyle(color: scheme.onSurfaceVariant)),
-        const SizedBox(height: 22),
-        const SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(strokeWidth: 3),
-        ),
-        const SizedBox(height: 14),
-        TextButton(
-          onPressed: _backToEmail,
-          child: const Text('Not you? Use a different email'),
-        ),
-      ],
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    final dark = context.isDark;
+    final orange = context.colors.violet;
+    final danger = context.colors.danger;
+    final height = MediaQuery.of(context).size.height;
+    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
 
-  Widget _createStep(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    return Form(
-      key: _createForm,
-      child: Column(
-        key: const ValueKey('create'),
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final redBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(13),
+      borderSide: BorderSide(color: danger, width: 1.5),
+    );
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: Stack(
         children: [
-          Row(
+          Positioned.fill(child: _HeroBackground(dark: dark)),
+          Column(
             children: [
-              Pressable(
-                borderRadius: 12,
-                onTap: _backToEmail,
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: scheme.outlineVariant),
-                  ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                height: keyboardOpen
+                    ? 76
+                    : _creating
+                    ? 170
+                    : (height * .36).clamp(210.0, 320.0),
+                width: double.infinity,
+                child: ClipRect(
+                  child: keyboardOpen
+                      ? _CompactHeader(dark: dark)
+                      : _Hero(dark: dark, compact: _creating),
                 ),
               ),
-              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'Create your account',
-                  style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: dark ? const Color(0xFF16161A) : Colors.white,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(32),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: dark ? .5 : .08),
+                        blurRadius: 30,
+                        offset: const Offset(0, -6),
+                      ),
+                    ],
+                  ),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          child: _creating
+                              ? _createView(context)
+                              : _signInView(
+                                  context,
+                                  danger: danger,
+                                  orange: orange,
+                                  dark: dark,
+                                  redBorder: redBorder,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            'No account was found for ${_email.text.trim()}. Add your details to get started.',
-            style: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
-          ),
-          const SizedBox(height: 18),
-          TextFormField(
-            controller: _name,
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.done,
-            decoration: const InputDecoration(
-              labelText: 'Full name',
-              prefixIcon: Icon(Icons.person_outline_rounded),
-            ),
-            validator: (value) =>
-                (value?.trim().length ?? 0) < 2 ? 'Enter your name.' : null,
-            onFieldSubmitted: (_) => _create(),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Your role',
-            style: text.labelLarge?.copyWith(color: scheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final role in _roles)
-                _RoleChip(
-                  label: role,
-                  selected: _role == role,
-                  onTap: () => setState(() => _role = role),
+        ],
+      ),
+    );
+  }
+}
+
+class _Heading extends StatelessWidget {
+  const _Heading();
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'Welcome back',
+        style: context.text.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        'Sign in with your email to continue.',
+        style: TextStyle(color: context.scheme.onSurfaceVariant),
+      ),
+    ],
+  );
+}
+
+class _HeroBackground extends StatelessWidget {
+  const _HeroBackground({required this.dark});
+  final bool dark;
+
+  @override
+  Widget build(BuildContext context) {
+    final glow = context.colors.violet;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: dark
+              ? const [Color(0xFF000000), Color(0xFF2A170A)]
+              : const [Color(0xFFFFF4E8), Color(0xFFFFB873)],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -70,
+            top: -60,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    glow.withValues(alpha: dark ? .5 : .35),
+                    glow.withValues(alpha: 0),
+                  ],
                 ),
-            ],
+              ),
+            ),
           ),
-          const SizedBox(height: 22),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _busy ? null : _create,
-              child: _busy
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    )
-                  : const Text('Create account'),
+          Positioned(
+            left: -90,
+            top: 90,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    glow.withValues(alpha: dark ? .22 : .25),
+                    glow.withValues(alpha: 0),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -361,220 +401,79 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 }
 
-class _RoleChip extends StatelessWidget {
-  const _RoleChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final primary = scheme.primary;
-    return Pressable(
-      borderRadius: 20,
-      scale: .94,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: selected
-              ? primary.withValues(alpha: .18)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: selected ? primary : scheme.outlineVariant,
-            width: selected ? 1.6 : 1,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: selected ? primary : scheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Hero extends StatefulWidget {
-  const _Hero({required this.compact});
+class _Hero extends StatelessWidget {
+  const _Hero({required this.dark, this.compact = false});
+  final bool dark;
   final bool compact;
 
   @override
-  State<_Hero> createState() => _HeroState();
-}
-
-class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
-  late final AnimationController _float = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 3),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _float.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(28, 22, 28, 30),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .18),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.white.withValues(alpha: .3)),
-              ),
-              child: const Icon(Icons.task_alt_rounded, color: Colors.white),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'taskMS',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -.3,
-              ),
-            ),
-          ],
-        ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topLeft,
-          child: widget.compact
-              ? const SizedBox(width: double.infinity)
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 26),
-                    const Text(
-                      'Plan the work.\nBeat the deadline.',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 30,
-                        height: 1.15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -.6,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      height: 112,
-                      child: AnimatedBuilder(
-                        animation: _float,
-                        builder: (context, _) {
-                          final t = Curves.easeInOut.transform(_float.value);
-                          return Stack(
-                            children: [
-                              Positioned(
-                                left: 0,
-                                top: 8 - 8 * t,
-                                child: const _MiniCard(
-                                  icon: Icons.check_circle_rounded,
-                                  title: 'Design onboarding',
-                                  subtitle: 'Due tomorrow',
-                                  width: 196,
-                                ),
-                              ),
-                              Positioned(
-                                right: 0,
-                                top: 40 + 8 * t,
-                                child: const _MiniCard(
-                                  icon: Icons.bolt_rounded,
-                                  title: '82% done',
-                                  subtitle: 'Sprint delivery',
-                                  width: 150,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+  Widget build(BuildContext context) => SafeArea(
+    bottom: false,
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: 36),
+      child: Center(
+        // Scales the logo block down on short screens instead of overflowing.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TaskMsLogo(size: compact ? 72 : 104),
+              const SizedBox(height: 4),
+              Text(
+                'taskMS',
+                style: TextStyle(
+                  color: dark ? Colors.white : AppTheme.ink,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -.5,
                 ),
+              ),
+              if (!compact) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Small teams. Big progress.',
+                  style: TextStyle(
+                    color: dark
+                        ? Colors.white70
+                        : AppTheme.ink.withValues(alpha: .7),
+                    fontSize: 13.5,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
-      ],
+      ),
     ),
   );
 }
 
-class _MiniCard extends StatelessWidget {
-  const _MiniCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.width,
-  });
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final double width;
+// Small header used while the keyboard is open, so the form keeps its space.
+class _CompactHeader extends StatelessWidget {
+  const _CompactHeader({required this.dark});
+  final bool dark;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: width,
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: .96),
-      borderRadius: BorderRadius.circular(18),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: .2),
-          blurRadius: 18,
-          offset: const Offset(0, 8),
-        ),
-      ],
-    ),
-    child: Row(
-      children: [
-        Icon(icon, color: AppTheme.teal),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppTheme.ink,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                ),
-              ),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF5B6478),
-                  fontSize: 11.5,
-                ),
-              ),
-            ],
+  Widget build(BuildContext context) => SafeArea(
+    bottom: false,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(24, 6, 24, 0),
+      child: Row(
+        children: [
+          const TaskMsLogo(size: 44),
+          const SizedBox(width: 6),
+          Text(
+            'taskMS',
+            style: TextStyle(
+              color: dark ? Colors.white : AppTheme.ink,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -.3,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
