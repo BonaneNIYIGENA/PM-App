@@ -2,125 +2,40 @@ import 'package:flutter/material.dart';
 
 import '../models/tasks.dart';
 import '../models/team_member.dart';
+import '../services/sla_service.dart';
 import '../theme/apptheme.dart';
 import '../widgets/common.dart';
+import '../widgets/member_form_sheet.dart';
 
 class TeamScreen extends StatelessWidget {
   const TeamScreen({
     super.key,
     required this.members,
+    required this.roles,
+    required this.onAddRole,
     required this.tasks,
     required this.onSave,
     required this.onDelete,
   });
   final List<TeamMember> members;
+  final List<String> roles;
+  final Future<void> Function(String name) onAddRole;
   final List<ProjectTask> tasks;
   final Future<void> Function(TeamMember member) onSave;
   final Future<void> Function(TeamMember member) onDelete;
 
   Future<void> _editMember(BuildContext context, [TeamMember? existing]) async {
-    final nameController = TextEditingController(text: existing?.name ?? '');
-    final emailController = TextEditingController(text: existing?.email ?? '');
-    final formKey = GlobalKey<FormState>();
-    final roles = [
-      'Project lead',
-      'Flutter developer',
-      'UI designer',
-      'QA engineer',
-      'Team member',
-    ];
-    var role = existing?.role ?? roles.last;
-    final saved = await showDialog<TeamMember>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(
-            existing == null ? 'Add team member' : 'Edit team member',
-          ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nameController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(labelText: 'Full name'),
-                    validator: (value) =>
-                        value == null || value.trim().length < 2
-                        ? 'Enter the member’s name.'
-                        : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                    validator: (value) {
-                      final email = value?.trim() ?? '';
-                      if (email.isEmpty) return 'Enter an email address.';
-                      if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                          .hasMatch(email)) {
-                        return 'Enter a valid email address.';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: roles.contains(role) ? role : roles.last,
-                    decoration: const InputDecoration(labelText: 'Role'),
-                    items: roles
-                        .map(
-                          (value) => DropdownMenuItem(
-                            value: value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) setDialogState(() => role = value);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-                final name = nameController.text.trim();
-                final initials = name
-                    .split(RegExp(r'\s+'))
-                    .take(2)
-                    .map((part) => part[0])
-                    .join()
-                    .toUpperCase();
-                Navigator.pop(
-                  dialogContext,
-                  TeamMember(
-                    id: existing?.id,
-                    name: name,
-                    role: role,
-                    email: emailController.text.trim(),
-                    initials: initials,
-                  ),
-                );
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+    final saved = await showFormSheet<TeamMember>(
+      context,
+      (_) => MemberFormSheet(
+        title: existing == null ? 'Add team member' : 'Edit team member',
+        submitLabel: existing == null ? 'Add member' : 'Save changes',
+        member: existing,
+        members: members,
+        roles: roles,
+        onAddRole: onAddRole,
       ),
     );
-    nameController.dispose();
-    emailController.dispose();
     if (saved != null) await onSave(saved);
   }
 
@@ -128,35 +43,23 @@ class TeamScreen extends StatelessWidget {
     // Last-member guard: the workspace must always keep at least one person
     if (members.length <= 1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You can’t remove the last team member.'),
-        ),
+        const SnackBar(content: Text('You can’t remove the last team member.')),
       );
       return;
     }
     final assigned = tasks.where((task) => task.assigneeId == member.id).length;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove team member?'),
-        content: Text(
-          assigned == 0
-              ? 'This profile will be removed.'
-              : '$assigned task(s) will become unassigned.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmSheet(
+      context,
+      icon: Icons.person_remove_outlined,
+      title: 'Remove ${member.name}?',
+      message: assigned == 0
+          ? 'They will be deleted from the workspace and will need to create '
+                'a new account to sign in again.'
+          : 'They will be deleted and need to create a new account to sign in '
+                'again. $assigned task(s) will become unassigned.',
+      confirmLabel: 'Remove',
     );
-    if (confirmed == true) await onDelete(member);
+    if (confirmed) await onDelete(member);
   }
 
   @override
@@ -202,14 +105,9 @@ class TeamScreen extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 10),
               child: _MemberCard(
                 member: members[i],
-                openTasks: tasks
-                    .where(
-                      (t) => t.assigneeId == members[i].id && !t.isCompleted,
-                    )
-                    .length,
-                totalTasks: tasks
+                tasks: tasks
                     .where((t) => t.assigneeId == members[i].id)
-                    .length,
+                    .toList(),
                 onEdit: () => _editMember(context, members[i]),
                 onDelete: () => _confirmDelete(context, members[i]),
               ),
@@ -220,94 +118,263 @@ class TeamScreen extends StatelessWidget {
   }
 }
 
-class _MemberCard extends StatelessWidget {
+class _MemberCard extends StatefulWidget {
   const _MemberCard({
     required this.member,
-    required this.openTasks,
-    required this.totalTasks,
+    required this.tasks,
     required this.onEdit,
     required this.onDelete,
   });
   final TeamMember member;
-  final int openTasks;
-  final int totalTasks;
+  final List<ProjectTask> tasks;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final done = totalTasks == 0 ? 0.0 : (totalTasks - openTasks) / totalTasks;
-    return AppCard(
-      onTap: onEdit,
-      child: Row(
+  State<_MemberCard> createState() => _MemberCardState();
+}
+
+class _MemberCardState extends State<_MemberCard> {
+  bool _expanded = false;
+
+  Widget _details(BuildContext context) {
+    final member = widget.member;
+    final muted = context.scheme.onSurfaceVariant;
+    final shown = widget.tasks.take(4).toList();
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          MemberAvatar(member: member, radius: 26),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  member.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  member.role,
-                  style: TextStyle(color: scheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 10),
-                Row(
+          InfoLine(
+            icon: Icons.mail_outline_rounded,
+            label: 'Email',
+            value: member.email,
+          ),
+          InfoLine(
+            icon: Icons.badge_outlined,
+            label: 'Role',
+            value: member.role,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Assigned tasks',
+            style: TextStyle(
+              color: muted,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (shown.isEmpty)
+            Text('No tasks assigned yet.', style: TextStyle(color: muted))
+          else
+            for (final task in shown)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
                   children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0, end: done),
-                          duration: const Duration(milliseconds: 800),
-                          curve: Curves.easeOutCubic,
-                          builder: (_, v, _) => LinearProgressIndicator(
-                            value: v,
-                            minHeight: 6,
-                            color: AppTheme.teal,
-                            backgroundColor: AppTheme.teal.withValues(
-                              alpha: .15,
-                            ),
-                          ),
-                        ),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: slaColor(context, SlaService.calculate(task)),
+                        shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Text(
-                      '$openTasks open',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: scheme.onSurfaceVariant,
+                    Expanded(
+                      child: Text(
+                        task.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
+                    ),
+                    Text(
+                      shortDate(task.deadline),
+                      style: TextStyle(color: muted, fontSize: 12),
                     ),
                   ],
                 ),
-              ],
+              ),
+          if (widget.tasks.length > shown.length)
+            Text(
+              '+ ${widget.tasks.length - shown.length} more',
+              style: TextStyle(color: muted, fontSize: 12),
             ),
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'Options',
-            icon: Icon(Icons.more_vert_rounded, color: scheme.onSurfaceVariant),
-            onSelected: (value) => value == 'edit' ? onEdit() : onDelete(),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'edit', child: Text('Edit')),
-              PopupMenuItem(value: 'delete', child: Text('Remove')),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: widget.onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: const Text('Edit'),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: widget.onDelete,
+                style: TextButton.styleFrom(
+                  foregroundColor: context.colors.danger,
+                ),
+                icon: const Icon(Icons.person_remove_outlined, size: 18),
+                label: const Text('Remove'),
+              ),
             ],
           ),
         ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final member = widget.member;
+    return AppCard(
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              MemberAvatar(member: member, radius: 26),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      member.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      member.role,
+                      style: TextStyle(color: scheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 10),
+                    _StatusBar(tasks: widget.tasks),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _expanded
+                ? _details(context)
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// One bar split by SLA status, so the colors show how a person's tasks stand.
+class _StatusBar extends StatelessWidget {
+  const _StatusBar({required this.tasks});
+  final List<ProjectTask> tasks;
+
+  static const _order = [
+    SlaStatus.completed,
+    SlaStatus.onTrack,
+    SlaStatus.atRisk,
+    SlaStatus.overdue,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = {for (final status in _order) status: 0};
+    for (final task in tasks) {
+      final status = SlaService.calculate(task);
+      counts[status] = counts[status]! + 1;
+    }
+    final present = [
+      for (final status in _order)
+        if (counts[status]! > 0) status,
+    ];
+
+    final bar = ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        height: 8,
+        child: present.isEmpty
+            ? ColoredBox(
+                color: context.scheme.outlineVariant,
+                child: const SizedBox.expand(),
+              )
+            : TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 700),
+                curve: Curves.easeOutCubic,
+                builder: (_, v, _) => Align(
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: v,
+                    child: Row(
+                      children: [
+                        for (final status in present)
+                          Expanded(
+                            flex: counts[status]!,
+                            child: ColoredBox(
+                              color: slaColor(context, status),
+                              child: const SizedBox.expand(),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        bar,
+        if (present.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
+            children: [
+              for (final status in present)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: slaColor(context, status),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '${counts[status]} ${SlaService.label(status).toLowerCase()}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: context.scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }
