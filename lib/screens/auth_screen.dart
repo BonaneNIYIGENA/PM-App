@@ -86,12 +86,14 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dark = context.isDark;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
     final gradient = dark
-        ? const [Color(0xFF000000), Color(0xFF1A1140)]
-        : const [Color(0xFF5B3BEA), Color(0xFF9A7BFF)];
+        ? const [Color(0xFF0F1626), Color(0xFF263B68)]
+        : const [AppTheme.navy, AppTheme.teal];
     return Scaffold(
-      backgroundColor: dark ? Colors.black : const Color(0xFF5B3BEA),
+      backgroundColor: dark ? const Color(0xFF0F1626) : AppTheme.navy,
       body: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -122,16 +124,14 @@ class _AuthScreenState extends State<AuthScreen> {
                               24 + MediaQuery.of(context).padding.bottom,
                             ),
                             decoration: BoxDecoration(
-                              color: dark
-                                  ? const Color(0xFF0C0C0E)
-                                  : context.scheme.surface,
+                              color: scheme.surface,
                               borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(36),
                               ),
                               border: dark
                                   ? Border(
                                       top: BorderSide(
-                                        color: context.scheme.outlineVariant,
+                                        color: scheme.outlineVariant,
                                       ),
                                     )
                                   : null,
@@ -174,65 +174,66 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _emailStep(BuildContext context) => Column(
-    key: const ValueKey('email'),
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        'Welcome to taskMS',
-        style: context.text.headlineSmall?.copyWith(
-          fontWeight: FontWeight.w800,
+  Widget _emailStep(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Column(
+      key: const ValueKey('email'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Welcome to taskMS',
+          style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
         ),
-      ),
-      const SizedBox(height: 6),
-      Text(
-        'Enter your email to sign in. New here? We’ll set up your account in a moment.',
-        style: TextStyle(color: context.scheme.onSurfaceVariant, height: 1.4),
-      ),
-      const SizedBox(height: 22),
-      Form(
-        key: _emailForm,
-        child: TextFormField(
-          controller: _email,
-          keyboardType: TextInputType.emailAddress,
-          autofillHints: const [AutofillHints.email],
-          textInputAction: TextInputAction.go,
-          decoration: const InputDecoration(
-            labelText: 'Email address',
-            prefixIcon: Icon(Icons.alternate_email_rounded),
-          ),
-          validator: (value) =>
-              RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                  .hasMatch(value?.trim() ?? '')
-              ? null
-              : 'Enter a valid email address.',
-          onFieldSubmitted: (_) => _continue(),
+        const SizedBox(height: 6),
+        Text(
+          'Enter your email to sign in. New here? We’ll set up your account in a moment.',
+          style: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
         ),
-      ),
-      const SizedBox(height: 16),
-      SizedBox(
-        width: double.infinity,
-        child: FilledButton.icon(
-          onPressed: _continue,
-          icon: const Icon(Icons.arrow_forward_rounded),
-          iconAlignment: IconAlignment.end,
-          label: const Text('Continue'),
-        ),
-      ),
-      const SizedBox(height: 18),
-      Center(
-        child: Text(
-          'Accounts are stored on this device only.',
-          style: TextStyle(
-            color: context.scheme.onSurfaceVariant,
-            fontSize: 12.5,
+        const SizedBox(height: 22),
+        Form(
+          key: _emailForm,
+          child: TextFormField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            autofillHints: const [AutofillHints.email],
+            textInputAction: TextInputAction.go,
+            decoration: const InputDecoration(
+              labelText: 'Email address',
+              prefixIcon: Icon(Icons.alternate_email_rounded),
+            ),
+            validator: (value) =>
+                RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                    .hasMatch(value?.trim() ?? '')
+                ? null
+                : 'Enter a valid email address.',
+            onFieldSubmitted: (_) => _continue(),
           ),
         ),
-      ),
-    ],
-  );
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _continue,
+            icon: const Icon(Icons.arrow_forward_rounded),
+            iconAlignment: IconAlignment.end,
+            label: const Text('Continue'),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Center(
+          child: Text(
+            'Accounts are stored on this device only.',
+            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _signingInStep(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
     final member = _match!;
     return Column(
       key: const ValueKey('signing'),
@@ -250,13 +251,10 @@ class _AuthScreenState extends State<AuthScreen> {
         const SizedBox(height: 16),
         Text(
           'Welcome back, ${member.name.split(' ').first}!',
-          style: context.text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 4),
-        Text(
-          member.role,
-          style: TextStyle(color: context.scheme.onSurfaceVariant),
-        ),
+        Text(member.role, style: TextStyle(color: scheme.onSurfaceVariant)),
         const SizedBox(height: 22),
         const SizedBox(
           width: 26,
@@ -272,94 +270,94 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _createStep(BuildContext context) => Form(
-    key: _createForm,
-    child: Column(
-      key: const ValueKey('create'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Pressable(
-              borderRadius: 12,
-              onTap: _backToEmail,
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.scheme.outlineVariant),
-                ),
-                child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Create your account',
-                style: context.text.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
+  Widget _createStep(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Form(
+      key: _createForm,
+      child: Column(
+        key: const ValueKey('create'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Pressable(
+                borderRadius: 12,
+                onTap: _backToEmail,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: scheme.outlineVariant),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'We couldn’t find ${_email.text.trim()}. Add your details to get started.',
-          style: TextStyle(color: context.scheme.onSurfaceVariant, height: 1.4),
-        ),
-        const SizedBox(height: 18),
-        TextFormField(
-          controller: _name,
-          autofocus: true,
-          textCapitalization: TextCapitalization.words,
-          textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(
-            labelText: 'Full name',
-            prefixIcon: Icon(Icons.person_outline_rounded),
-          ),
-          validator: (value) =>
-              (value?.trim().length ?? 0) < 2 ? 'Enter your name.' : null,
-          onFieldSubmitted: (_) => _create(),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'Your role',
-          style: context.text.labelLarge?.copyWith(
-            color: context.scheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final role in _roles)
-              _RoleChip(
-                label: role,
-                selected: _role == role,
-                onTap: () => setState(() => _role = role),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Create your account',
+                  style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                ),
               ),
-          ],
-        ),
-        const SizedBox(height: 22),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _busy ? null : _create,
-            child: _busy
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  )
-                : const Text('Create account'),
+            ],
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(height: 10),
+          Text(
+            'We couldn’t find ${_email.text.trim()}. Add your details to get started.',
+            style: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
+          ),
+          const SizedBox(height: 18),
+          TextFormField(
+            controller: _name,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              labelText: 'Full name',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+            ),
+            validator: (value) =>
+                (value?.trim().length ?? 0) < 2 ? 'Enter your name.' : null,
+            onFieldSubmitted: (_) => _create(),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Your role',
+            style: text.labelLarge?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final role in _roles)
+                _RoleChip(
+                  label: role,
+                  selected: _role == role,
+                  onTap: () => setState(() => _role = role),
+                ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _busy ? null : _create,
+              child: _busy
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : const Text('Create account'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _RoleChip extends StatelessWidget {
@@ -374,7 +372,8 @@ class _RoleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = context.scheme.primary;
+    final scheme = Theme.of(context).colorScheme;
+    final primary = scheme.primary;
     return Pressable(
       borderRadius: 20,
       scale: .94,
@@ -384,11 +383,11 @@ class _RoleChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: selected
-              ? context.soft(primary, alpha: .18)
+              ? primary.withValues(alpha: .18)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? primary : context.scheme.outlineVariant,
+            color: selected ? primary : scheme.outlineVariant,
             width: selected ? 1.6 : 1,
           ),
         ),
@@ -396,7 +395,7 @@ class _RoleChip extends StatelessWidget {
           label,
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            color: selected ? primary : context.scheme.onSurfaceVariant,
+            color: selected ? primary : scheme.onSurfaceVariant,
           ),
         ),
       ),
@@ -545,7 +544,7 @@ class _MiniCard extends StatelessWidget {
     ),
     child: Row(
       children: [
-        Icon(icon, color: const Color(0xFF6C4CF1)),
+        Icon(icon, color: AppTheme.teal),
         const SizedBox(width: 8),
         Expanded(
           child: Column(
@@ -557,7 +556,7 @@ class _MiniCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF15141C),
+                  color: AppTheme.ink,
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
                 ),
@@ -567,7 +566,7 @@ class _MiniCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  color: Color(0xFF5D5A70),
+                  color: Color(0xFF5B6478),
                   fontSize: 11.5,
                 ),
               ),
